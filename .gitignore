@@ -1,0 +1,14 @@
+# Binários gerados por compilação
+**/build/
+*.bin
+*.elf
+*.map
+
+# Arquivos temporários do sistema
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Backups e rascunhos
+*.tmp
+*.bak
