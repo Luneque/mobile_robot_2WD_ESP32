@@ -71,14 +71,14 @@
 #define LADO_QUADRADO_MM   500.0f   // Comprimento de cada lado em mm (50 cm)
 #define ANGULO_CURVA_GRAUS 90.0f    // Ângulo de cada curva em graus
 
-#define VELOCIDADE_CRUZEIRO_RPM 65.0f // Velocidade alvo para avanço em linha reta (~238 mm/s)
+#define VELOCIDADE_CRUZEIRO_RPM 80.0f // Velocidade alvo para avanço em linha reta (~293 mm/s, aumento de 23%)
 #define VELOCIDADE_MIN_RPM      20.0f // Velocidade mínima de rampa (para não estolar)
-#define VELOCIDADE_GIRO_RPM     40.0f // Velocidade alvo para curvas em pivô central
+#define VELOCIDADE_GIRO_RPM     50.0f // Velocidade alvo para curvas em pivô central (~1,3 s por giro)
 #define PAUSA_ENTRE_MOVIMENTOS_MS 800 // Pausa de estabilização entre movimentos
 
 // Distâncias de aceleração e desaceleração para perfil trapezoidal (em mm)
-#define RAMPA_ACEL_DIST_MM  100.0f  // Acelera suavemente nos primeiros 100 mm
-#define RAMPA_DESACEL_DIST_MM 120.0f // Desacelera suavemente nos últimos 120 mm
+#define RAMPA_ACEL_DIST_MM  120.0f  // Acelera suavemente nos primeiros 120 mm
+#define RAMPA_DESACEL_DIST_MM 130.0f // Desacelera suavemente nos últimos 130 mm
 
 // Ângulos de aceleração e desaceleração para curva pivô (em graus)
 #define RAMPA_CURVA_ACEL_GRAUS   20.0f
