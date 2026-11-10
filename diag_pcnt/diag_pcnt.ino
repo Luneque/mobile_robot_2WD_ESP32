@@ -16,6 +16,9 @@
 #define PIN_ENC2_A 33
 #define PIN_ENC2_B 32
 
+// Calibração: 12 PPR * Redução 1:90 * Quadratura 4x = 4320 pulsos por volta
+#define PULSOS_POR_VOLTA 4320.0f
+
 #define PCNT_HIGH_LIMIT 30000
 #define PCNT_LOW_LIMIT  -30000
 
@@ -151,8 +154,8 @@ void loop() {
 
     if (millis() - lastPrint >= 150) {
         lastPrint = millis();
-        float voltas1 = (float)g_accum1 / 2160.0f;
-        float voltas2 = (float)g_accum2 / 2160.0f;
+        float voltas1 = (float)g_accum1 / PULSOS_POR_VOLTA;
+        float voltas2 = (float)g_accum2 / PULSOS_POR_VOLTA;
 
         Serial.printf("[PCNT] ESQ (Enc1): %6lld pulsos (%+5.2f v)  |  DIR (Enc2): %6lld pulsos (%+5.2f v)\n",
                       g_accum1, voltas1, g_accum2, voltas2);
