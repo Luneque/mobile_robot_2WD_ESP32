@@ -66,6 +66,12 @@
 // Ganho de sincronismo cruzado entre rodas (Cross-Coupling Synchronization)
 #define K_SYNC             0.05f
 
+// ==========================================
+// 4.1 FUSÃO SENSORIAL E CONTROLE ANGULAR COM IMU (BMI160)
+// ==========================================
+#define IMU_HABILITADA     true     // Habilita a correcao por giroscopio
+#define IMU_KP_YAW_RETA    1.2f     // Ganho de correcao angular em linha reta (us por grau de desvio)
+#define IMU_KP_PIVO        0.8f     // Ganho proporcional do giro de pivo orientado a IMU
 #define CONTROL_LOOP_MS    20       // Período de amostragem do loop de controle (20ms = 50Hz)
 
 // ==========================================

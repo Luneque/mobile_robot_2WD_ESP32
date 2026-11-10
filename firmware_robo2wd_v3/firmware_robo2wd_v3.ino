@@ -3,20 +3,24 @@
 #include "motor_control_mcpwm.h"
 #include "encoder_reader_pcnt.h"
 #include "pid_controller.h"
+#include "imu_bmi160.h"
 #include "esp_task_wdt.h"
 
 // =========================================================================
-// FIRMWARE ROBO 2WD - VERSAO 3 (ARQUITETURA ROBUSTA & SEGURA)
+// FIRMWARE ROBO 2WD - VERSAO 3 (MCPWM + PCNT + IMU BMI160)
 // Melhorias Implementadas:
 //  1. Validacao estrita no setup() com aborto seguro em caso de falha de hardware.
 //  2. Task Watchdog Timer do ESP32 ativo (WDT de 3s).
 //  3. Perfil de velocidade trapezoidal (aceleracao e desaceleracao suaves).
 //  4. Checagem de stall / desbalanceamento em curvas pivo (girar).
 //  5. Maquina de estados nao-bloqueante no loop() com aguardo real de comando.
+//  6. Integracao com IMU BMI160: correcao de rumo em retas e curvas pivo com
+//     parada de alta precisao baseada no angulo real de Yaw.
 // =========================================================================
 
 MotorControlMCPWM motors;
 EncoderReaderPCNT encoders;
+IMU_BMI160 imu;
 
 PIDController pid1(PID_KP_M1, PID_KI_M1, PID_KD_M1, ESC_MIN_US, ESC_MAX_US, ESC_NEUTRO_US);
 PIDController pid2(PID_KP_M2, PID_KI_M2, PID_KD_M2, ESC_MIN_US, ESC_MAX_US, ESC_NEUTRO_US);
@@ -116,6 +120,7 @@ void iniciarMovimentoReta(float distanciaMm) {
     encoders.reset();
     pid1.reset();
     pid2.reset();
+    imu.resetYaw(); // Zera a orientação de referência para a reta
     g_desbalStartTime = 0;
     subEstado = SUB_EM_MOVIMENTO;
     Serial.printf("\n[V3-RETA] Lado %d de %d | Dist: %.1f mm | Alvo: %d ticks\n",
@@ -131,6 +136,7 @@ void iniciarMovimentoCurva(float anguloGraus, int sentido) {
     encoders.reset();
     pid1.reset();
     pid2.reset();
+    imu.resetYaw(); // Zera o ângulo para medir os 90° exatos via giroscópio
     g_desbalStartTime = 0;
     subEstado = SUB_EM_MOVIMENTO;
     Serial.printf("\n[V3-PIVO] Curva %d de %d | Angulo: %.1f deg (%s) | Alvo: %d ticks/roda\n",
@@ -142,6 +148,10 @@ void processarControleMovimento(uint32_t now) {
     g_lastLoopTime = now;
 
     encoders.updateSpeed(dt);
+    if (imu.isInitialized()) {
+        imu.update(dt);
+    }
+
     float rpm1 = encoders.getRPM1();
     float rpm2 = encoders.getRPM2();
 
@@ -149,13 +159,28 @@ void processarControleMovimento(uint32_t now) {
     int32_t t2 = abs(encoders.getTicksM2());
     int32_t avgTicks = (t1 + t2) / 2;
 
-    // 1. Critério de Parada por Odometria
-    if (avgTicks >= g_targetTicks) {
+    float yawAtual = abs(imu.getYawAngleDeg());
+
+    // 1. Critério de Parada
+    bool atingiuMeta = false;
+    if (g_emLinhaReta) {
+        // Na reta, o critério primário é a distância por encoders
+        atingiuMeta = (avgTicks >= g_targetTicks);
+    } else {
+        // Na curva pivô, se a IMU estiver ativa, ela é a autoridade máxima do ângulo de 90°
+        if (imu.isInitialized()) {
+            atingiuMeta = (yawAtual >= g_anguloTotalGraus) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f));
+        } else {
+            atingiuMeta = (avgTicks >= g_targetTicks);
+        }
+    }
+
+    if (atingiuMeta) {
         motors.stopAll();
         subEstado = SUB_PAUSA_ESTABILIZACAO;
         g_pausaStartTime = now;
-        Serial.printf("[V3-STOP] Segmento concluido. Ticks: (%d, %d). Pausando %d ms...\n",
-                      encoders.getTicksM1(), encoders.getTicksM2(), PAUSA_ENTRE_MOVIMENTOS_MS);
+        Serial.printf("[V3-STOP] Segmento concluido. Ticks: (%d, %d) | Yaw IMU: %+.1f deg. Pausando %d ms...\n",
+                      encoders.getTicksM1(), encoders.getTicksM2(), imu.getYawAngleDeg(), PAUSA_ENTRE_MOVIMENTOS_MS);
         return;
     }
 
@@ -188,9 +213,16 @@ void processarControleMovimento(uint32_t now) {
         float out1 = pid1.compute(targetRpmM1, rpm1, dt);
         float out2 = pid2.compute(targetRpmM2, rpm2, dt);
 
-        // Sincronismo Cruzado em Reta
+        // Sincronismo Cruzado Híbrido: Encoders + Correção Giroscópica da IMU
         float sync_error = (float)(encoders.getTicksM1() - encoders.getTicksM2());
         float sync_corr = sync_error * K_SYNC;
+
+        // Se a IMU estiver ativa, adiciona compensação de guinada (Yaw) para travar o rumo reto
+        if (imu.isInitialized()) {
+            float imu_yaw_error = imu.getYawAngleDeg(); // >0 se desviou para a esquerda/direita
+            sync_corr += imu_yaw_error * IMU_KP_YAW_RETA;
+        }
+
         if (sync_corr > 35.0f) sync_corr = 35.0f;
         if (sync_corr < -35.0f) sync_corr = -35.0f;
 
@@ -202,11 +234,17 @@ void processarControleMovimento(uint32_t now) {
 
         if (now - g_lastPrintTime >= 250) {
             g_lastPrintTime = now;
-            Serial.printf("[RETA] %d/%d ticks | RPM Alvo: %.1f | Real: (%.1f, %.1f) | PWM: (%u, %u)\n",
-                          avgTicks, g_targetTicks, rpmTrapezio, rpm1, rpm2, (uint32_t)out1, (uint32_t)out2);
+            Serial.printf("[RETA] %d/%d ticks | Yaw: %+.1f deg | RPM Alvo: %.1f | Real: (%.1f, %.1f) | PWM: (%u, %u)\n",
+                          avgTicks, g_targetTicks, imu.getYawAngleDeg(), rpmTrapezio, rpm1, rpm2, (uint32_t)out1, (uint32_t)out2);
         }
     } else {
-        float rpmTrapezio = calcularRPMTrapezoidalCurva(avgTicks, g_targetTicks);
+        // Na curva pivô, o perfil trapezoidal desacelera conforme se aproxima dos 90° lidos pela IMU
+        int32_t progressoTicks = avgTicks;
+        if (imu.isInitialized() && g_anguloTotalGraus > 0.0f) {
+            progressoTicks = (int32_t)((yawAtual / g_anguloTotalGraus) * (float)g_targetTicks);
+        }
+
+        float rpmTrapezio = calcularRPMTrapezoidalCurva(progressoTicks, g_targetTicks);
         targetRpmM1 = (g_sentidoGiro > 0) ?  rpmTrapezio : -rpmTrapezio;
         targetRpmM2 = (g_sentidoGiro > 0) ? -rpmTrapezio :  rpmTrapezio;
 
@@ -232,8 +270,8 @@ void processarControleMovimento(uint32_t now) {
 
         if (now - g_lastPrintTime >= 200) {
             g_lastPrintTime = now;
-            Serial.printf("[PIVO] %d/%d ticks | RPM Alvo: %.1f | Real: (%.1f, %.1f) | PWM: (%u, %u)\n",
-                          avgTicks, g_targetTicks, rpmTrapezio, rpm1, rpm2, (uint32_t)out1, (uint32_t)out2);
+            Serial.printf("[PIVO] Yaw: %5.1f/%4.1f deg | %d/%d ticks | RPM: (%.1f, %.1f) | PWM: (%u, %u)\n",
+                          yawAtual, g_anguloTotalGraus, avgTicks, g_targetTicks, rpm1, rpm2, (uint32_t)out1, (uint32_t)out2);
         }
     }
 }
@@ -269,7 +307,17 @@ void setup() {
 
     Serial.println("[OK] MCPWM e PCNT inicializados com sucesso.");
 
-    // 2. Procedimento de Armamento do ESC (antes de subscrever a task no WDT)
+    // 2. Inicializacao e Calibracao da IMU Bosch BMI160
+    if (imu.begin()) {
+        Serial.println("[OK] IMU BMI160 detectada com sucesso (Chip ID 0xD1).");
+        Serial.println("[IMU] Calibrando giroscopio estatico (mantenha o robo parado)...");
+        imu.calibrateGyro(150);
+        Serial.println("[OK] Calibracao de Giroscopio concluida!");
+    } else {
+        Serial.println("[AVISO] IMU BMI160 nao detectada no barramento I2C. Operando apenas com odometria PCNT.");
+    }
+
+    // 3. Procedimento de Armamento do ESC (antes de subscrever a task no WDT)
     Serial.printf("[STATUS] Arming ESC via MCPWM (%d ms em neutro 1500 us)...\n", ESC_ARM_TEMPO_MS);
     motors.stopAll();
     delay(ESC_ARM_TEMPO_MS);
