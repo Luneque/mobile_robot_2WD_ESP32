@@ -40,20 +40,25 @@ A versão oficial do firmware (**Versão 3**) opera com:
            ┌────────────────────────────┼────────────────────────────┐
            │                            │                            │
      [ MCPWM SAÍDAS ]             [ ENCODER 1 (ESQ) ]          [ ENCODER 2 (DIR) ]
-   GPIO 19 ──► ESC Sinal CH1    GPIO 23 ◄── Fase A           GPIO 33 ◄── Fase A
-   GPIO 18 ──► ESC Sinal CH2    GPIO 22 ◄── Fase B           GPIO 32 ◄── Fase B
+   GPIO 19 ──► ESC Sinal CH1    GPIO 16 ◄── Fase A           GPIO 33 ◄── Fase A
+   GPIO 18 ──► ESC Sinal CH2    GPIO 17 ◄── Fase B           GPIO 32 ◄── Fase B
                                 (Pull-up interno +           (Pull-up interno +
-                                 Filtro PCNT 1000ns)          Filtro PCNT 1000ns)
+     [ I2C DISPONÍVEL ]          Filtro PCNT 1000ns)          Filtro PCNT 1000ns)
+   GPIO 21 ──► I2C SDA
+   GPIO 22 ──► I2C SCL
 ```
 
 | Sinal | Pino GPIO | Tipo de Periférico | Função |
 | :--- | :---: | :---: | :--- |
 | **ESC Motor Esquerdo (CH1)** | `GPIO 19` | MCPWM (Timer 0, Gen 1) | Sinal de velocidade/sentido do motor esquerdo |
 | **ESC Motor Direito (CH2)** | `GPIO 18` | MCPWM (Timer 0, Gen 2) | Sinal de velocidade/sentido do motor direito |
-| **Encoder Esquerdo — Fase A** | `GPIO 23` | PCNT (Unidade 0, Canal A) | Quadratura 4x do motor esquerdo |
-| **Encoder Esquerdo — Fase B** | `GPIO 22` | PCNT (Unidade 0, Canal B) | Quadratura 4x do motor esquerdo |
+| **Encoder Esquerdo — Fase A** | `GPIO 16` | PCNT (Unidade 0, Canal A) | Quadratura 4x do motor esquerdo (mesmo lado da placa) |
+| **Encoder Esquerdo — Fase B** | `GPIO 17` | PCNT (Unidade 0, Canal B) | Quadratura 4x do motor esquerdo (mesmo lado da placa) |
 | **Encoder Direito — Fase A** | `GPIO 33` | PCNT (Unidade 1, Canal A) | Quadratura 4x do motor direito |
 | **Encoder Direito — Fase B** | `GPIO 32` | PCNT (Unidade 1, Canal B) | Quadratura 4x do motor direito |
+| **I2C — SDA (Dados)** | `GPIO 21` | I2C Padrão Hardware | **LIVRE** para IMU, OLED, ToF e barômetro |
+| **I2C — SCL (Clock)** | `GPIO 22` | I2C Padrão Hardware | **LIVRE** para IMU, OLED, ToF e barômetro |
+| **GPIO Geral** | `GPIO 23` | GPIO Universal | **LIVRE** (ex: pino INT de IMU ou trigger) |
 
 ---
 

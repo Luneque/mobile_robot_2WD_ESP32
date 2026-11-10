@@ -6,13 +6,17 @@
 // ==========================================
 // 1. MAPEAMENTO DE PINOS (GPIOs)
 // ==========================================
+// Barramento I2C Padrão (Liberado para IMU / Sensores)
+#define PIN_I2C_SDA        21   // Linha de dados SDA
+#define PIN_I2C_SCL        22   // Linha de clock SCL
+
 // ESC - Controle dos Motores DC via MCPWM de Hardware
 #define PIN_ESC_CH1        19   // Conectado ao ESC Canal 1 (Motor 1 - Esquerdo)
 #define PIN_ESC_CH2        18   // Conectado ao ESC Canal 2 (Motor 2 - Direito)
 
-// Encoder 1 (Motor Esquerdo) - Leitura por Hardware PCNT
-#define PIN_ENC1_A         23   // Canal A
-#define PIN_ENC1_B         22   // Canal B
+// Encoder 1 (Motor Esquerdo) - Reorganizado para GPIO 16 e 17 (mesmo lado da placa)
+#define PIN_ENC1_A         16   // Canal A (antigo GPIO 23)
+#define PIN_ENC1_B         17   // Canal B (antigo GPIO 22)
 
 // Encoder 2 (Motor Direito) - Leitura por Hardware PCNT
 #define PIN_ENC2_A         33   // Canal A

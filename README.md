@@ -61,10 +61,13 @@ Teste_car_0/
 | :---: | :---: | :--- |
 | **GPIO 19** | MCPWM Op1 | Sinal do ESC Motor Esquerdo (Canal 1) |
 | **GPIO 18** | MCPWM Op2 | Sinal do ESC Motor Direito (Canal 2) |
-| **GPIO 23** | PCNT Unit0 | Fase A do Encoder Esquerdo |
-| **GPIO 22** | PCNT Unit0 | Fase B do Encoder Esquerdo |
+| **GPIO 16** | PCNT Unit0 | Fase A do Encoder Esquerdo (mesmo lado da placa) |
+| **GPIO 17** | PCNT Unit0 | Fase B do Encoder Esquerdo (mesmo lado da placa) |
 | **GPIO 33** | PCNT Unit1 | Fase A do Encoder Direito |
 | **GPIO 32** | PCNT Unit1 | Fase B do Encoder Direito |
+| **GPIO 21** | I2C SDA | **LIVRE** para expansão I2C (IMU, Display, Sensores) |
+| **GPIO 22** | I2C SCL | **LIVRE** para expansão I2C (IMU, Display, Sensores) |
+| **GPIO 23** | GPIO | **LIVRE** para uso geral / interrupção |
 
 ---
 

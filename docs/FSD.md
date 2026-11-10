@@ -75,10 +75,13 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | :---: | :---: | :--- |
 | **GPIO 19** | MCPWM Operador 1 / Gerador 1 | Entrada de sinal Canal 1 do ESC (Motor 1 — Esquerdo) |
 | **GPIO 18** | MCPWM Operador 2 / Gerador 2 | Entrada de sinal Canal 2 do ESC (Motor 2 — Direito) |
-| **GPIO 23** | PCNT Unidade 0 / Canal A | Fase A do Encoder 1 (Motor Esquerdo) |
-| **GPIO 22** | PCNT Unidade 0 / Canal B | Fase B do Encoder 1 (Motor Esquerdo) |
+| **GPIO 16** | PCNT Unidade 0 / Canal A | Fase A do Encoder 1 (Motor Esquerdo, mesmo lado da placa) |
+| **GPIO 17** | PCNT Unidade 0 / Canal B | Fase B do Encoder 1 (Motor Esquerdo, mesmo lado da placa) |
 | **GPIO 33** | PCNT Unidade 1 / Canal A | Fase A do Encoder 2 (Motor Direito) |
 | **GPIO 32** | PCNT Unidade 1 / Canal B | Fase B do Encoder 2 (Motor Direito) |
+| **GPIO 21** | I2C Hardware (SDA) | **LIVRE** para barramento I2C (Dispositivos / Sensores) |
+| **GPIO 22** | I2C Hardware (SCL) | **LIVRE** para barramento I2C (Dispositivos / Sensores) |
+| **GPIO 23** | GPIO Universal | **LIVRE** (ex: interrupção INT da IMU) |
 
 ---
 

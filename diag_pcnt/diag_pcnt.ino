@@ -1,8 +1,8 @@
 /*
  * diag_pcnt.ino - Validador de Contagem e Polaridade com Hardware PCNT (ESP32)
  *
- * Mapeamento:
- *  Motor 1 (Esquerda): Fase A = GPIO 23, Fase B = GPIO 22
+ * Mapeamento Atualizado (GPIO 21 e 22 liberados para I2C):
+ *  Motor 1 (Esquerda): Fase A = GPIO 16, Fase B = GPIO 17
  *  Motor 2 (Direita):  Fase A = GPIO 33, Fase B = GPIO 32
  *
  * Taxa da Serial: 115200 baud
@@ -11,8 +11,8 @@
 #include <Arduino.h>
 #include "driver/pulse_cnt.h"
 
-#define PIN_ENC1_A 23
-#define PIN_ENC1_B 22
+#define PIN_ENC1_A 16
+#define PIN_ENC1_B 17
 #define PIN_ENC2_A 33
 #define PIN_ENC2_B 32
 
