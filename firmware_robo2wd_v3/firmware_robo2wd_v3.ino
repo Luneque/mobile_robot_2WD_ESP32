@@ -269,22 +269,30 @@ void setup() {
 
     Serial.println("[OK] MCPWM e PCNT inicializados com sucesso.");
 
-    // 2. Configuracao do Task Watchdog Timer (WDT)
+    // 2. Procedimento de Armamento do ESC (antes de subscrever a task no WDT)
+    Serial.printf("[STATUS] Arming ESC via MCPWM (%d ms em neutro 1500 us)...\n", ESC_ARM_TEMPO_MS);
+    motors.stopAll();
+    delay(ESC_ARM_TEMPO_MS);
+    Serial.println("[STATUS] ESC Armado com sucesso!");
+
+    // 3. Reconfiguracao e ativacao do Task Watchdog Timer (WDT)
+    // No ESP-IDF v5, o TWDT ja vem ativo por padrao (5s). Usamos reconfigure para ajustar o timeout real.
     esp_task_wdt_config_t wdt_config = {
         .timeout_ms = WDT_TIMEOUT_SECONDS * 1000,
         .idle_core_mask = 0,
         .trigger_panic = true
     };
-    esp_task_wdt_init(&wdt_config);
-    esp_task_wdt_add(NULL); // Adiciona a tarefa loop atual ao watchdog
-    Serial.printf("[OK] Hardware Task Watchdog ativado (%d segundos).\n", WDT_TIMEOUT_SECONDS);
-
-    // 3. Procedimento de Armamento do ESC
-    Serial.printf("[STATUS] Arming ESC via MCPWM (%d ms em neutro 1500 us)...\n", ESC_ARM_TEMPO_MS);
-    motors.stopAll();
-    delay(ESC_ARM_TEMPO_MS);
-
-    Serial.println("[STATUS] ESC Armado com sucesso!");
+    esp_err_t wdt_err = esp_task_wdt_reconfigure(&wdt_config);
+    if (wdt_err != ESP_OK) {
+        // Fallback caso reconfigure falhe (ex: se TWDT nao estivesse inicializado)
+        esp_task_wdt_init(&wdt_config);
+    }
+    esp_err_t add_err = esp_task_wdt_add(NULL); // Subscreve a loopTask agora que o boot terminou
+    if (add_err == ESP_OK) {
+        Serial.printf("[OK] Hardware Task Watchdog reconfigurado e ativo (%d segundos).\n", WDT_TIMEOUT_SECONDS);
+    } else {
+        Serial.printf("[AVISO] Nao foi possivel subscrever tarefa ao WDT (codigo: %d)\n", add_err);
+    }
     Serial.println("\n=======================================================");
     Serial.println(" Envie 's' ou 'g' pelo Monitor Serial para iniciar...");
     Serial.println(" (Ou aguarde 5 segundos para início automático)");

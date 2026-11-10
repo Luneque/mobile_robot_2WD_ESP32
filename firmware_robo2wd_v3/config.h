@@ -77,12 +77,13 @@
 #define PAUSA_ENTRE_MOVIMENTOS_MS 800 // Pausa de estabilização entre movimentos
 
 // Distâncias de aceleração e desaceleração para perfil trapezoidal (em mm)
-#define RAMPA_ACEL_DIST_MM  120.0f  // Acelera suavemente nos primeiros 120 mm
-#define RAMPA_DESACEL_DIST_MM 130.0f // Desacelera suavemente nos últimos 130 mm
+// Rampas encurtadas para aceleração ágil (~600 mm/s²) mantendo 78% do segmento em 80 RPM
+#define RAMPA_ACEL_DIST_MM   50.0f  // Acelera de 20 a 80 RPM nos primeiros 50 mm (~0.25 s)
+#define RAMPA_DESACEL_DIST_MM 60.0f // Desacelera nos últimos 60 mm para parada sem deslizamento (~0.30 s)
 
 // Ângulos de aceleração e desaceleração para curva pivô (em graus)
-#define RAMPA_CURVA_ACEL_GRAUS   20.0f
-#define RAMPA_CURVA_DESACEL_GRAUS 25.0f
+#define RAMPA_CURVA_ACEL_GRAUS    10.0f // Acelera nos primeiros 10 graus
+#define RAMPA_CURVA_DESACEL_GRAUS 15.0f // Desacelera nos ultimos 15 graus
 
 // ==========================================
 // 6. REGRAS DE SEGURANÇA, WATCHDOG E TELEMETRIA
