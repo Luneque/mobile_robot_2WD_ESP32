@@ -8,8 +8,9 @@
 | :--- | :--- |
 | **Título** | FSD — Firmware Final de Controle de Trajetória para Robô Diferencial 2WD (MCPWM + PCNT) |
 | **Status** | Aprovado e Homologado |
-| **Versão Homologada** | 2.0.0 (MCPWM + PCNT Hardware) |
-| **Data** | 09/11/2026 |
+| **Versão Oficial Homologada** | **3.0.0 (MCPWM + PCNT Hardware + FSM Não-Bloqueante + Perfil Trapezoidal)** |
+| **Versões Legadas** | v1.0.0 (LEDC/Software ISRs) e v2.0.0 (MCPWM/PCNT Bloqueante) movidas para `legacy/` |
+| **Data** | 10/11/2026 |
 | **Autor/Responsável** | Engenharia de Firmware & Controle |
 
 ---
@@ -17,13 +18,17 @@
 ### 2. Visão Geral e Objetivos do Sistema
 
 #### 2.1 Descrição Geral
-O projeto consiste no desenvolvimento e homologação do firmware embarcado para um robô móvel de tração diferencial (2WD) baseado no microcontrolador **ESP32-D0WD-V3**. O sistema executa com alta precisão uma trajetória geométrica quadrada fechada de 4 lados (500 mm por lado com curvas pivô de 90° sobre o próprio eixo), empregando controle de velocidade em malha fechada (PID), sincronismo dinâmico entre rodas (*cross-coupling*) e leitura de encoders em quadratura 4x.
+O projeto consiste no desenvolvimento e homologação do firmware embarcado para um robô móvel de tração diferencial (2WD) baseado no microcontrolador **ESP32-D0WD-V3**. O sistema executa com alta precisão e repetibilidade uma trajetória geométrica quadrada fechada de 4 lados (500 mm por lado com curvas pivô de 90° sobre o próprio eixo), empregando controle de velocidade em malha fechada (PID), sincronismo dinâmico entre rodas (*cross-coupling*), rampa de aceleração/desaceleração trapezoidal e leitura de encoders em quadratura 4x.
 
-#### 2.2 Diferencial Tecnológico da Arquitetura
-Diferente de abordagens tradicionais que utilizam interrupções de software na CPU (ISRs) e temporizadores genéricos de PWM, o firmware utiliza **100% de periféricos dedicados de hardware no silício do ESP32**:
-1. **Periférico PCNT (Pulse Counter):** Decodifica por hardware a quadratura 4x dos encoders com filtros digitais anti-ruído (*glitch filters*), eliminando sobrecarga da CPU.
-2. **Periférico MCPWM (Motor Control PWM):** Gera pulsos de servo/ESC a 50 Hz com resolução de $1\,\mu\text{s}$ via timer de hardware dedicado de 1 MHz.
-3. **Malha de Sincronismo Cruzado (*Cross-Coupling Synchronization*):** Elimina atritos assimétricos e diferenças de tolerância mecânica entre motores, travando as rodas no mesmo avanço em retas e no mesmo arco em giros.
+#### 2.2 Pilares Tecnológicos da Versão 3 (Oficial)
+1. **Periférico PCNT (Pulse Counter):** Decodifica por hardware a quadratura 4x dos encoders com filtros digitais anti-ruído (*glitch filters* de 1000 ns), eliminando qualquer sobrecarga de CPU.
+2. **Periférico MCPWM (Motor Control PWM):** Gera pulsos de controle para o ESC a 50 Hz com resolução de $1\,\mu\text{s}$ via timer dedicado de 1 MHz.
+3. **Máquina de Estados Não-Bloqueante (FSM):** Toda a lógica opera orientada a tempo no `loop()`, permitindo integração com sensores futuros e comunicação sem loops de espera com `delay()`.
+4. **Perfil de Velocidade Trapezoidal:** Rampas progressivas de aceleração (50 mm) e desaceleração (60 mm), eliminando derrapagens (*wheel slip*) e permitindo velocidade de cruzeiro de **80 RPM** ($\approx 293\text{ mm/s}$).
+5. **Segurança Ativa e Hardware Watchdog:**
+   * Detecção de desbalanceamento e stall em retas e curvas pivô.
+   * Task Watchdog Timer do ESP32 (`esp_task_wdt`) ativo e reconfigurado para 3 segundos.
+   * Validação estrita no boot com bloqueio seguro caso algum periférico falhe.
 
 #### 2.3 Fora do Escopo Desta Versão
 - Controle remoto por telecomando (Wi-Fi, Bluetooth ou rádio RC).
@@ -48,12 +53,12 @@ Diferente de abordagens tradicionais que utilizam interrupções de software na 
   - **Sinal Neutro (Parado):** $1500\,\mu\text{s}$.
   - **Faixa de Avanço:** $1501\,\mu\text{s}$ a $1850\,\mu\text{s}$ (máximo calibrado).
   - **Faixa de Ré:** $1150\,\mu\text{s}$ (máximo calibrado) a $1499\,\mu\text{s}$.
-  - **Zona Morta do ESC (*Deadband*):** $\approx \pm 50\,\mu\text{s}$.
+  - **Zona Morta do ESC (*Deadband*):** $\approx \pm 50\,\mu\text{s}$ (compensada via Feedforward).
 
 #### 3.3 Sensores de Realimentação (Encoders)
-- **Tipo:** Encoders magnéticos de efeito Hall acoplados ao eixo traseiro de cada motor.
+- **Tipo:** Encoders magnéticos de efeito Hall montados no eixo traseiro dos motores.
 - **PPR do Disco:** 12 pulsos por revolução (PPR) por canal.
-- **Modo de Decodificação:** Quadratura 4x (avaliação de todas as transições de subida e descida dos canais A e B).
+- **Modo de Decodificação:** Quadratura 4x via hardware PCNT.
 - **Resolução Efetiva Homologada:** **4.320 pulsos por volta completa da roda** ($12 \times 90 \times 4 = 4.320$).
 
 #### 3.4 Geometria e Cinemática do Robô
@@ -77,109 +82,55 @@ Diferente de abordagens tradicionais que utilizam interrupções de software na 
 
 ---
 
-### 5. Arquitetura do Firmware e Algoritmos de Controle
+### 5. Parâmetros Calibrados e Homologados (v3.0.0)
 
-O firmware é estruturado de forma modular em C++ com componentes independentes:
-
-```
-firmware_robo2wd_v2/
-├── config.h                 // Centralização de constantes, pinos, ganhos e cinemática
-├── motor_control_mcpwm.h    // Driver de hardware ESP-IDF MCPWM (50 Hz, 1 us)
-├── encoder_reader_pcnt.h    // Driver de hardware ESP-IDF PCNT (Quadratura 4x + Filtro)
-├── pid_controller.h         // Algoritmo PID com Anti-Windup e Feedforward de Deadband
-└── firmware_robo2wd_v2.ino  // Máquina de estados, sincronismo cruzado e trajetória
-```
-
-#### 5.1 Driver de Motores via Hardware MCPWM
-- **Frequência do Timer:** Base de $1\text{ MHz}$ (resolução de $1\,\mu\text{s}$ por contagem).
-- **Período:** $20.000\text{ ticks}$ ($20\text{ ms} = 50\text{ Hz}$).
-- **Atualização:** O comparador de hardware sincroniza com o evento de zeramento do timer (`TEZ`), garantindo sinais PWM de saída sem instabilidade de jitter.
-
-#### 5.2 Leitura dos Encoders via Hardware PCNT
-- Duas unidades de hardware (`_unit1` e `_unit2`) configuradas com contadores com sinal de 16 bits.
-- Filtro de ruído por hardware (*glitch filter*) de $1000\text{ ns}$ ativo em todos os canais para rejeição de transientes de comutação dos motores.
-- **Filtro Exponencial de Velocidade (EMA):**
-  $$\text{RPM}_k = 0,70 \cdot \text{RPM}_{k-1} + 0,30 \cdot \text{RPM}_{\text{instantâneo}}$$
-  Suprime a quantização discreta da janela de amostragem de 20 ms.
-
-#### 5.3 Malha de Controle PID com Sincronismo Cruzado (*Cross-Coupling*)
-Para cada roda, a saída do controlador em microssegundos é calculada a cada período de $20\text{ ms}$ ($50\text{ Hz}$):
-
-$$\text{Saída}_{\text{PID}} = \text{Neutro} + \text{Feedforward} + K_p \cdot e(t) + K_i \int e(t)\,dt + K_d \frac{de(t)}{dt}$$
-
-* **Feedforward de Zona Morta:** Somado automaticamente ($\pm 50\,\mu\text{s}$) conforme o sentido do comando para superar o atrito estático e a zona morta do ESC.
-* **Anti-Windup:** Integração clamped em $\pm 250$ para evitar sobressinal na partida e na parada.
-
-##### Sincronismo Cruzado em Linha Reta:
-Monitora a diferença instantânea de pulsos percorridos entre as rodas:
-$$e_{\text{sync}} = t_1 - t_2$$
-$$\text{Compensação} = \text{sat}\left(e_{\text{sync}} \cdot K_{\text{sync}},\, \pm 35\,\mu\text{s}\right)$$
-$$\text{Saída}_{\text{M1}} = \text{Saída}_{\text{PID1}} - \text{Compensação}$$
-$$\text{Saída}_{\text{M2}} = \text{Saída}_{\text{PID2}} + \text{Compensação}$$
-
-##### Sincronismo Cruzado em Giros de Pivô:
-Garante arcos idênticos percorridos em sentidos opostos, assegurando que o centro de rotação permaneça rigorosamente no eixo central do robô:
-$$e_{\text{sync\_pivô}} = |t_1| - |t_2|$$
-
----
-
-### 6. Parâmetros Calibrados e Homologados
-
-| Parâmetro | Macro no Código | Valor Homologado | Unidade / Efeito |
+| Parâmetro | Macro no Código | Valor Homologado | Efeito Funcional |
 | :--- | :--- | :---: | :--- |
-| **Resolução Efetiva** | `PPR_EFETIVO` | `4320.0f` | pulsos por volta completa |
-| **Velocidade de Cruzeiro** | `VELOCIDADE_CRUZEIRO_RPM` | `65.0f` | $\approx 238\text{ mm/s}$ (~2,1 s por reta) |
-| **Velocidade de Curva** | `VELOCIDADE_GIRO_RPM` | `40.0f` | $\approx 1,4\text{ s}$ por giro de 90° |
+| **Resolução Efetiva** | `PPR_EFETIVO` | `4320.0f` | pulsos por volta completa da roda |
+| **Velocidade de Cruzeiro** | `VELOCIDADE_CRUZEIRO_RPM` | `80.0f` | $\approx 293\text{ mm/s}$ (~1,88 s por lado de 500 mm) |
+| **Velocidade Mínima de Rampa** | `VELOCIDADE_MIN_RPM` | `20.0f` | Garante torque inicial sem estolar o motor |
+| **Velocidade de Curva** | `VELOCIDADE_GIRO_RPM` | `50.0f` | $\approx 0,52\text{ s}$ por giro de 90° |
+| **Rampa de Aceleração** | `RAMPA_ACEL_DIST_MM` | `50.0f` | Aceleração ágil ($\approx 600\text{ mm/s}^2$) sem patinar |
+| **Rampa de Desaceleração** | `RAMPA_DESACEL_DIST_MM` | `60.0f` | Frenagem progressiva cravada na marca |
+| **Rampa de Giro (Acel/Desacel)**| `RAMPA_CURVA_ACEL/DESACEL` | `10.0° / 15.0°` | Transição suave no pivô de 90° |
 | **Ganho Proporcional** | `PID_KP_M1`, `PID_KP_M2` | `1.8f` | Resposta rápida sem sobre-oscilação |
-| **Ganho Integral** | `PID_KI_M1`, `PID_KI_M2` | `0.6f` | Zera o erro de velocidade em regime |
-| **Ganho Derivativo** | `PID_KD_M1`, `PID_KD_M2` | `0.02f` | Amortecimento dinâmico |
+| **Ganho Integral** | `PID_KI_M1`, `PID_KI_M2` | `0.6f` | Zera erro em regime permanente |
+| **Ganho Derivativo** | `PID_KD_M1`, `PID_KD_M2` | `0.02f` | Amortecimento de transientes |
 | **Ganho de Sincronismo** | `K_SYNC` | `0.05f` | Trava o avanço relativo entre rodas |
-| **Zona Morta do ESC** | `ESC_DEADBAND_US` | `50.0f` | Microssegundos de compensação |
-| **Pausa Entre Movimentos** | `PAUSA_ENTRE_MOVIMENTOS_MS` | `800` | Dissipação de inércia residual |
-| **Comprimento do Lado** | `LADO_QUADRADO_MM` | `500.0f` | Lado do quadrado (50 cm) |
-| **Ângulo da Curva** | `ANGULO_CURVA_GRAUS` | `90.0f` | Giro de 90° no pivô central |
+| **Timeout do Watchdog** | `WDT_TIMEOUT_SECONDS` | `3` | Reinício automático em caso de travamento |
+| **Pausa de Estabilização** | `PAUSA_ENTRE_MOVIMENTOS_MS` | `800` | Dissipação de inércia residual |
 
 ---
 
-### 7. Sequência de Inicialização e Operação
+### 6. Arquitetura de Software e Máquina de Estados (FSM)
 
 ```mermaid
 stateDiagram-v2
     [*] --> Armamento_ESC: Boot do ESP32
     Armamento_ESC --> Aguardo_Comando: 3000 ms em Neutro (1500 us)
-    Aguardo_Comando --> Contagem_Regressiva: Comando 's' recebido na Serial
-    Contagem_Regressiva --> Executando_Quadrado: Contagem de 3 segundos
+    Aguardo_Comando --> Executando_Trajetoria: 's' recebido na Serial ou Timeout de 5s
     
-    state Executando_Quadrado {
-        [*] --> Reta: Lado n de 4
-        Reta --> Pausa_Estabilizacao_1: 500 mm atingidos
-        Pausa_Estabilizacao_1 --> Giro_Pivo: 800 ms decorridos
-        Giro_Pivo --> Pausa_Estabilizacao_2: 90 graus atingidos
-        Pausa_Estabilizacao_2 --> Reta: Lado < 4
-        Pausa_Estabilizacao_2 --> [*]: Lado == 4
+    state Executando_Trajetoria {
+        [*] --> Iniciar_Reta
+        Iniciar_Reta --> Movimento_Reta: Rampa Trapezoidal (50mm / 60mm)
+        Movimento_Reta --> Pausa_Reta: 500 mm atingidos
+        Pausa_Reta --> Iniciar_Curva: 800 ms decorridos
+        Iniciar_Curva --> Movimento_Curva: Rampa de Giro (10° / 15°)
+        Movimento_Curva --> Pausa_Curva: 90° atingidos
+        Pausa_Curva --> Iniciar_Reta: Lado < 4
+        Pausa_Curva --> [*]: Lado == 4
     }
 
-    Executando_Quadrado --> Concluido: 4 Lados e 4 Curvas finalizados
-    Executando_Quadrado --> Emergencia: Desbalanceamento > 45% por > 800 ms
-    Concluido --> [*]: Motores Parados (1500 us)
+    Executando_Trajetoria --> Concluido: 4 Lados e 4 Curvas finalizados
+    Executando_Trajetoria --> Emergencia: Stall / Desbalanceamento > 45%
+    Concluido --> Aguardo_Comando: 's' recebido para repetir
     Emergencia --> [*]: Corte Imediato dos Motores
 ```
 
 ---
 
-### 8. Procedimento de Compilação e Gravação
+### 7. Histórico de Versões e Transição
 
-* **Ferramenta de Compilação:** Arduino CLI (Core ESP32 v3.3.12).
-* **Placa:** `esp32:esp32:esp32`
-* **Porta:** `COM9` (CP210x Bridge)
-* **Baud Rate da Serial:** `115200 baud`
-* **Baud Rate de Gravação:** `921600 baud`
-* **Comando de Gravação Direta via `esptool`:**
-  ```powershell
-  esptool.exe --chip esp32 --port COM9 --baud 921600 --before default-reset --after hard-reset write_flash -z --flash-mode dio --flash-freq 80m --flash-size 4MB 0x1000 firmware_robo2wd_v2.ino.bootloader.bin 0x8000 firmware_robo2wd_v2.ino.partitions.bin 0xe000 boot_app0.bin 0x10000 firmware_robo2wd_v2.ino.bin
-  ```
-
----
-
-### 9. Conclusão e Homologação
-Esta implementação atende a 100% dos requisitos de controle, repetibilidade métrica e segurança operacional estabelecidos. Os códigos e bibliotecas localizados em `firmware_robo2wd_v2/` constituem a base oficial e definitiva para futuros projetos de robótica móvel sobre esta plataforma.
+* **v1.0.0 (Legado - `legacy/firmware_robo2wd/`):** Utilizava PWM via LEDC e leitura de encoders por interrupções de software (`attachInterrupt`). Apresentava gargalo de CPU e perda de pulsos.
+* **v2.0.0 (Legado - `legacy/firmware_robo2wd_v2/`):** Migrou para MCPWM e PCNT em hardware, comprovando a redução real de 1:90 ($4.320\text{ pulsos/volta}$) e introduzindo o sincronismo cruzado. Execução em loops bloqueantes dentro do `setup()`.
+* **v3.0.0 (OFICIAL - `firmware_robo2wd_v3/`):** Arquitetura definitiva não-bloqueante no `loop()`, perfil trapezoidal de velocidade otimizado para 80 RPM, Task Watchdog Timer reconfigurado e checagem de stall em retas e curvas.
