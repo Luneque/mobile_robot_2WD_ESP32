@@ -18,7 +18,7 @@ O sistema executa com extrema repetibilidade e controle em malha fechada uma tra
   * **MCPWM (Motor Control PWM):** Timer de 1 MHz dedicado gerando pulsos para ESC a 50 Hz com resolução de $1\,\mu\text{s}$.
   * **PCNT (Pulse Counter):** Decodificação por hardware de quadratura 4x com filtro digital de 1000 ns, desonerando 100% da CPU.
 * **Máquina de Estados Não-Bloqueante (FSM):**
-  * O loop principal roda orientado a tempo (`millis()`), pronto para acomodar futuros sensores (LiDAR, ultrassom, IMU) ou nós ROS 2.
+  * O loop principal roda orientado a tempo (`millis()`), pronto para acomodar futuros sensores (LiDAR, ultrassom) ou nós ROS 2 (a IMU BMI160 já está integrada).
 * **Perfil de Velocidade Trapezoidal Otimizado (80 RPM):**
   * Rampas progressivas de aceleração (50 mm) e desaceleração (60 mm).
   * Velocidade de cruzeiro de **80 RPM ($\approx 293\text{ mm/s}$)** cobrindo 78% do trajeto em apenas **$\approx 1,88\text{ s}$ por reta**, sem derrapagens na partida ou parada.
@@ -65,8 +65,8 @@ Teste_car_0/
 | **GPIO 17** | PCNT Unit0 | Fase B do Encoder Esquerdo (mesmo lado da placa) |
 | **GPIO 33** | PCNT Unit1 | Fase A do Encoder Direito |
 | **GPIO 32** | PCNT Unit1 | Fase B do Encoder Direito |
-| **GPIO 21** | I2C SDA | **LIVRE** para expansão I2C (IMU, Display, Sensores) |
-| **GPIO 22** | I2C SCL | **LIVRE** para expansão I2C (IMU, Display, Sensores) |
+| **GPIO 21** | I2C SDA | **USADO** – SDA da IMU BMI160 |
+| **GPIO 22** | I2C SCL | **USADO** – SCL da IMU BMI160 |
 | **GPIO 23** | GPIO | **LIVRE** para uso geral / interrupção |
 
 ---

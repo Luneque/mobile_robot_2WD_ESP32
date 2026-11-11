@@ -48,6 +48,7 @@ SubEstadoMovimento subEstado = SUB_INICIAR_SEGMENTO;
 // Variáveis de controle de trajetória do quadrado
 int g_ladoAtual = 1;
 bool g_emLinhaReta = true; // true = reta, false = giro de 90°
+float g_yawRef = 0.0f; // Referência de yaw para cada segmento (reta ou curva)
 
 uint32_t g_lastLoopTime = 0;
 uint32_t g_lastPrintTime = 0;
@@ -121,6 +122,7 @@ void iniciarMovimentoReta(float distanciaMm) {
     pid1.reset();
     pid2.reset();
     imu.resetYaw(); // Zera a orientação de referência para a reta
+    g_yawRef = imu.getYawAngleDeg(); // Captura offset residual pós-reset (normalmente 0)
     g_desbalStartTime = 0;
     subEstado = SUB_EM_MOVIMENTO;
     Serial.printf("\n[V3-RETA] Lado %d de %d | Dist: %.1f mm | Alvo: %d ticks\n",
@@ -137,6 +139,7 @@ void iniciarMovimentoCurva(float anguloGraus, int sentido) {
     pid1.reset();
     pid2.reset();
     imu.resetYaw(); // Zera o ângulo para medir os 90° exatos via giroscópio
+    g_yawRef = imu.getYawAngleDeg(); // Captura offset residual pós-reset (normalmente 0)
     g_desbalStartTime = 0;
     subEstado = SUB_EM_MOVIMENTO;
     Serial.printf("\n[V3-PIVO] Curva %d de %d | Angulo: %.1f deg (%s) | Alvo: %d ticks/roda\n",
@@ -159,7 +162,9 @@ void processarControleMovimento(uint32_t now) {
     int32_t t2 = abs(encoders.getTicksM2());
     int32_t avgTicks = (t1 + t2) / 2;
 
-    float yawAtual = abs(imu.getYawAngleDeg());
+    float yawAtual = imu.getYawAngleDeg();         // valor bruto com sinal
+    float yawError = yawAtual - g_yawRef;          // erro relativo ao início do segmento (preserva sinal)
+    float yawAbs   = fabsf(yawError);              // magnitude para critério de parada de curva
 
     // 1. Critério de Parada
     bool atingiuMeta = false;
@@ -169,7 +174,8 @@ void processarControleMovimento(uint32_t now) {
     } else {
         // Na curva pivô, se a IMU estiver ativa, ela é a autoridade máxima do ângulo de 90°
         if (imu.isInitialized()) {
-            atingiuMeta = (yawAtual >= g_anguloTotalGraus) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f));
+            // IMU é a autoridade de ângulo; ticks são fallback de segurança (+15%)
+            atingiuMeta = (yawAbs >= (g_anguloTotalGraus - 2.0f)) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f));
         } else {
             atingiuMeta = (avgTicks >= g_targetTicks);
         }
@@ -218,9 +224,9 @@ void processarControleMovimento(uint32_t now) {
         float sync_corr = sync_error * K_SYNC;
 
         // Se a IMU estiver ativa, adiciona compensação de guinada (Yaw) para travar o rumo reto
+        // yawError é sinalizado: positivo = desviou para esquerda, negativo = para direita
         if (imu.isInitialized()) {
-            float imu_yaw_error = imu.getYawAngleDeg(); // >0 se desviou para a esquerda/direita
-            sync_corr += imu_yaw_error * IMU_KP_YAW_RETA;
+            sync_corr += yawError * IMU_KP_YAW_RETA;
         }
 
         if (sync_corr > 35.0f) sync_corr = 35.0f;
@@ -241,7 +247,8 @@ void processarControleMovimento(uint32_t now) {
         // Na curva pivô, o perfil trapezoidal desacelera conforme se aproxima dos 90° lidos pela IMU
         int32_t progressoTicks = avgTicks;
         if (imu.isInitialized() && g_anguloTotalGraus > 0.0f) {
-            progressoTicks = (int32_t)((yawAtual / g_anguloTotalGraus) * (float)g_targetTicks);
+            // Usa yawAbs (magnitude do erro relativo) para mapear o progresso da curva
+            progressoTicks = (int32_t)((yawAbs / g_anguloTotalGraus) * (float)g_targetTicks);
         }
 
         float rpmTrapezio = calcularRPMTrapezoidalCurva(progressoTicks, g_targetTicks);
@@ -251,9 +258,15 @@ void processarControleMovimento(uint32_t now) {
         float out1 = pid1.compute(targetRpmM1, rpm1, dt);
         float out2 = pid2.compute(targetRpmM2, rpm2, dt);
 
-        // Sincronismo Cruzado em Pivô
+        // Sincronismo Cruzado em Pivô + Correção de Yaw via IMU (IMU_KP_PIVO)
         float sync_error_pivot = (float)(t1 - t2);
         float sync_corr = sync_error_pivot * K_SYNC;
+
+        // Aplica correção de yaw da IMU no pivô: yawError sinalizado indica desvio de trajetória
+        if (imu.isInitialized()) {
+            sync_corr += yawError * IMU_KP_PIVO;
+        }
+
         if (sync_corr > 35.0f) sync_corr = 35.0f;
         if (sync_corr < -35.0f) sync_corr = -35.0f;
 
@@ -270,8 +283,8 @@ void processarControleMovimento(uint32_t now) {
 
         if (now - g_lastPrintTime >= 200) {
             g_lastPrintTime = now;
-            Serial.printf("[PIVO] Yaw: %5.1f/%4.1f deg | %d/%d ticks | RPM: (%.1f, %.1f) | PWM: (%u, %u)\n",
-                          yawAtual, g_anguloTotalGraus, avgTicks, g_targetTicks, rpm1, rpm2, (uint32_t)out1, (uint32_t)out2);
+            Serial.printf("[PIVO] Yaw: %+5.1f/%4.1f deg | %d/%d ticks | RPM: (%.1f, %.1f) | PWM: (%u, %u)\n",
+                          yawError, g_anguloTotalGraus, avgTicks, g_targetTicks, rpm1, rpm2, (uint32_t)out1, (uint32_t)out2);
         }
     }
 }

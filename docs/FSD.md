@@ -30,10 +30,10 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
    * Task Watchdog Timer do ESP32 (`esp_task_wdt`) ativo e reconfigurado para 3 segundos.
    * Validação estrita no boot com bloqueio seguro caso algum periférico falhe.
 
-#### 2.3 Fora do Escopo Desta Versão
+#### 2.3 Escopo da Versão
 - Controle remoto por telecomando (Wi-Fi, Bluetooth ou rádio RC).
 - Navegação autônoma em mapa dinâmico (SLAM) e desvio de obstáculos.
-- Fusão sensorial com IMU externa (Giroscópio/Acelerômetro).
+- Integração de IMU BMI160 (giroscópio + acelerômetro) para correção de rumo e parada de pivô.
 
 ---
 
@@ -82,6 +82,11 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | **GPIO 21** | I2C Hardware (SDA) | **LIVRE** para barramento I2C (Dispositivos / Sensores) |
 | **GPIO 22** | I2C Hardware (SCL) | **LIVRE** para barramento I2C (Dispositivos / Sensores) |
 | **GPIO 23** | GPIO Universal | **LIVRE** (ex: interrupção INT da IMU) |
+
+### 4.5 Sensores de Inércia – IMU BMI160
+- **GPIO 21 (SDA)** e **GPIO 22 (SCL)** conectados ao sensor IMU BMI160 (giroscópio + acelerômetro).
+- **GPIO 23** pode ser usado como sinal de interrupção **INT** da IMU (opcional).
+- O driver `imu_bmi160.h` fornece leitura de ângulo de guinada (yaw) e calibração de polaridade.
 
 ---
 

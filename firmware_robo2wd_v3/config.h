@@ -69,9 +69,9 @@
 // ==========================================
 // 4.1 FUSÃO SENSORIAL E CONTROLE ANGULAR COM IMU (BMI160)
 // ==========================================
-#define IMU_HABILITADA     true     // Habilita a correcao por giroscopio
+#define IMU_HABILITADA     true     // Habilita a correcao por giroscopio // Flag reservado para futuro toggle de habilitação da IMU (atualmente sempre true)
 #define IMU_KP_YAW_RETA    0.6f     // Ganho amortecido para manter rumo estavel sem entrar em conflito com encoders
-#define IMU_KP_PIVO        0.8f     // Ganho proporcional do giro de pivo orientado a IMU
+#define IMU_KP_PIVO        0.8f     // Ganho proporcional do giro de pivo orientado a IMU // Placeholder para ajuste futuro de controle de pivô com a IMU
 #define CONTROL_LOOP_MS    20       // Período de amostragem do loop de controle (20ms = 50Hz)
 
 // ==========================================

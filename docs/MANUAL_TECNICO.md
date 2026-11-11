@@ -56,9 +56,15 @@ A versão oficial do firmware (**Versão 3**) opera com:
 | **Encoder Esquerdo — Fase B** | `GPIO 17` | PCNT (Unidade 0, Canal B) | Quadratura 4x do motor esquerdo (mesmo lado da placa) |
 | **Encoder Direito — Fase A** | `GPIO 33` | PCNT (Unidade 1, Canal A) | Quadratura 4x do motor direito |
 | **Encoder Direito — Fase B** | `GPIO 32` | PCNT (Unidade 1, Canal B) | Quadratura 4x do motor direito |
-| **I2C — SDA (Dados)** | `GPIO 21` | I2C Padrão Hardware | **LIVRE** para IMU, OLED, ToF e barômetro |
-| **I2C — SCL (Clock)** | `GPIO 22` | I2C Padrão Hardware | **LIVRE** para IMU, OLED, ToF e barômetro |
+| **I2C — SDA (Dados)** | `GPIO 21` | I2C Padrão Hardware | **USADO** – SDA da IMU BMI160 |
+| **I2C — SCL (Clock)** | `GPIO 22` | I2C Padrão Hardware | **USADO** – SCL da IMU BMI160 |
 | **GPIO Geral** | `GPIO 23` | GPIO Universal | **LIVRE** (ex: pino INT de IMU ou trigger) |
+
+### 4.5 Sensores de Inércia – IMU BMI160
+- **GPIO 21 (SDA)** e **GPIO 22 (SCL)** conectados ao sensor BMI160 (giroscópio + acelerômetro).
+- **GPIO 23** pode ser usado como sinal de interrupção **INT** da IMU (opcional).
+- O driver `imu_bmi160.h` fornece leitura de ângulo de guinada (yaw) e calibração de polaridade.
+
 
 ---
 
