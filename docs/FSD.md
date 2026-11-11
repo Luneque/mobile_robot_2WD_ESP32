@@ -87,10 +87,10 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 - **GPIO 21 (SDA)** e **GPIO 22 (SCL)** conectados ao sensor IMU BMI160 (giroscópio + acelerômetro).
 - **GPIO 23** pode ser usado como sinal de interrupção **INT** da IMU (opcional).
 - O driver `imu_bmi160.h` fornece leitura de ângulo de guinada (yaw) e calibração de polaridade.
-- **Lógica de controle por erro relativo:** A cada início de segmento (reta ou curva), o firmware captura a referência `g_yawRef = imu.getYawAngleDeg()` imediatamente após `resetYaw()`. O erro de Yaw é calculado como `yawError = yawAngle - yawRef`, preservando o sinal e tornando o controle independente de *drift* residual pós-reset.
+- **Lógica de controle por erro relativo:** A cada início de segmento (reta ou curva), `imu.resetYaw()` zera o ângulo de yaw. O erro de yaw é o próprio ângulo medido (`yawError = yawAtual`), relativo ao início do segmento e com sinal preservado (horário = positivo).
   - **Retas:** `sync_corr += yawError * IMU_KP_YAW_RETA` — corrige desvio lateral aplicando diferencial de velocidade entre as rodas.
   - **Curvas (pivô):** `sync_corr += yawError * IMU_KP_PIVO` — reforça o critério de parada por Yaw; a curva encerra quando `|yawError| ≥ (ânguloAlvo − 2°)`.
-- **Acelerômetro:** Inicializado e lido pelo driver (ODR 100 Hz, faixa ±4 g), mas seus dados não são utilizados no controle atual. Disponível para fusão sensorial futura (estimativa de inclinação ou detecção de colisão).
+- **Acelerômetro:** Inicializado pelo driver (ODR 100 Hz, faixa ±2 g), mas não lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura. Disponível para fusão sensorial futura (estimativa de inclinação ou detecção de colisão).
 
 ---
 

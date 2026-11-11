@@ -48,7 +48,6 @@ SubEstadoMovimento subEstado = SUB_INICIAR_SEGMENTO;
 // Variáveis de controle de trajetória do quadrado
 int g_ladoAtual = 1;
 bool g_emLinhaReta = true; // true = reta, false = giro de 90°
-float g_yawRef = 0.0f; // Referência de yaw para cada segmento (reta ou curva)
 
 uint32_t g_lastLoopTime = 0;
 uint32_t g_lastPrintTime = 0;
@@ -122,7 +121,6 @@ void iniciarMovimentoReta(float distanciaMm) {
     pid1.reset();
     pid2.reset();
     imu.resetYaw(); // Zera a orientação de referência para a reta
-    g_yawRef = imu.getYawAngleDeg(); // Captura offset residual pós-reset (normalmente 0)
     g_desbalStartTime = 0;
     subEstado = SUB_EM_MOVIMENTO;
     Serial.printf("\n[V3-RETA] Lado %d de %d | Dist: %.1f mm | Alvo: %d ticks\n",
@@ -139,7 +137,6 @@ void iniciarMovimentoCurva(float anguloGraus, int sentido) {
     pid1.reset();
     pid2.reset();
     imu.resetYaw(); // Zera o ângulo para medir os 90° exatos via giroscópio
-    g_yawRef = imu.getYawAngleDeg(); // Captura offset residual pós-reset (normalmente 0)
     g_desbalStartTime = 0;
     subEstado = SUB_EM_MOVIMENTO;
     Serial.printf("\n[V3-PIVO] Curva %d de %d | Angulo: %.1f deg (%s) | Alvo: %d ticks/roda\n",
@@ -163,7 +160,7 @@ void processarControleMovimento(uint32_t now) {
     int32_t avgTicks = (t1 + t2) / 2;
 
     float yawAtual = imu.getYawAngleDeg();         // valor bruto com sinal
-    float yawError = yawAtual - g_yawRef;          // erro relativo ao início do segmento (preserva sinal)
+    float yawError = yawAtual;                     // erro relativo ao início do segmento (resetYaw zera o ângulo)
     float yawAbs   = fabsf(yawError);              // magnitude para critério de parada de curva
 
     // 1. Critério de Parada

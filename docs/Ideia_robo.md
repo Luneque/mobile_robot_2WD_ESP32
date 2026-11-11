@@ -1,5 +1,11 @@
 # Robô 2WD
 
+> **[HISTÓRICO — Ideação original, pré-V1]**
+> Este documento registra a concepção inicial do projeto e o levantamento de materiais.
+> O mapeamento de pinos abaixo é o da Versão 1 e **não corresponde ao firmware oficial V3**
+> (encoder esquerdo em GPIO 16/17, I2C da IMU BMI160 em GPIO 21/22). Consulte
+> `README.md`, `docs/FSD.md` e `docs/MANUAL_TECNICO.md` para o estado atual.
+
 ## Materiais
  - Chassi Circular (foto2.png)
  - 2 Rodas
