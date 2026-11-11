@@ -38,6 +38,7 @@ O sistema executa com extrema repetibilidade e controle em malha fechada uma tra
 Teste_car_0/
 ├── firmware_robo2wd_v3/       # [OFICIAL] Código-fonte ativo da Versão 3
 │   ├── config.h               # Configuração cinemática, limites, ganhos e rampas
+│   ├── imu_bmi160.h           # Driver I2C nativo para IMU Bosch BMI160 (Yaw + calibração de bias)
 │   ├── motor_control_mcpwm.h  # Driver MCPWM (1 MHz, 50 Hz, 1 us)
 │   ├── encoder_reader_pcnt.h  # Driver PCNT (Quadratura 4x + Filtro EMA)
 │   ├── pid_controller.h       # PID com Feedforward e Anti-Windup
@@ -46,7 +47,11 @@ Teste_car_0/
 │   ├── firmware_robo2wd/      # Versão 1: LEDC + Interrupções de software (ISRs)
 │   └── firmware_robo2wd_v2/   # Versão 2: MCPWM + PCNT em loops bloqueantes
 ├── diag_pcnt/                 # Utilitário de diagnóstico e calibração de encoders em hardware
-├── diag_encoders/             # Utilitário legado de teste de encoders
+├── diag_i2c_bmi160/           # Utilitário de diagnóstico I2C e leitura da IMU BMI160
+│   └── diag_i2c_bmi160.ino
+├── calib_imu_polaridade/      # Ferramenta de validação da polaridade do eixo Z da IMU
+│   └── calib_imu_polaridade.ino
+├── diag_encoders/             # [LEGADO V1] Utilitário de teste de encoders (pinout GPIO 23/22, não compatível com V3)
 └── docs/                      # Documentação técnica e de engenharia
     ├── FSD.md                 # Especificação Funcional Definitiva (v3.0.0 em PT-BR)
     ├── MANUAL_TECNICO.md      # Manual completo de pinagem, cinemática, operação e compilação

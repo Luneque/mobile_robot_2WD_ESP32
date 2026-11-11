@@ -13,7 +13,7 @@
  *  0x69 (quando SDO/SA0 = VCC)
  *
  * Registradores Importantes do BMI160:
- *  0x00: CHIP_ID (espera-se ler 0xD8)
+ *  0x00: CHIP_ID (espera-se ler 0xD1)
  *  0x7E: CMD (0x11 liga acelerometro, 0x15 liga giroscopio, 0xB6 faz soft-reset)
  *  0x02: Erros
  *  0x03: Status de PMU

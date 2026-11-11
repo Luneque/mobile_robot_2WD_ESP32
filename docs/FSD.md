@@ -79,14 +79,18 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | **GPIO 17** | PCNT Unidade 0 / Canal B | Fase B do Encoder 1 (Motor Esquerdo, mesmo lado da placa) |
 | **GPIO 33** | PCNT Unidade 1 / Canal A | Fase A do Encoder 2 (Motor Direito) |
 | **GPIO 32** | PCNT Unidade 1 / Canal B | Fase B do Encoder 2 (Motor Direito) |
-| **GPIO 21** | I2C Hardware (SDA) | **LIVRE** para barramento I2C (Dispositivos / Sensores) |
-| **GPIO 22** | I2C Hardware (SCL) | **LIVRE** para barramento I2C (Dispositivos / Sensores) |
+| **GPIO 21** | I2C Hardware (SDA) | **USADO** — SDA da IMU BMI160 |
+| **GPIO 22** | I2C Hardware (SCL) | **USADO** — SCL da IMU BMI160 |
 | **GPIO 23** | GPIO Universal | **LIVRE** (ex: interrupção INT da IMU) |
 
 ### 4.5 Sensores de Inércia – IMU BMI160
 - **GPIO 21 (SDA)** e **GPIO 22 (SCL)** conectados ao sensor IMU BMI160 (giroscópio + acelerômetro).
 - **GPIO 23** pode ser usado como sinal de interrupção **INT** da IMU (opcional).
 - O driver `imu_bmi160.h` fornece leitura de ângulo de guinada (yaw) e calibração de polaridade.
+- **Lógica de controle por erro relativo:** A cada início de segmento (reta ou curva), o firmware captura a referência `g_yawRef = imu.getYawAngleDeg()` imediatamente após `resetYaw()`. O erro de Yaw é calculado como `yawError = yawAngle - yawRef`, preservando o sinal e tornando o controle independente de *drift* residual pós-reset.
+  - **Retas:** `sync_corr += yawError * IMU_KP_YAW_RETA` — corrige desvio lateral aplicando diferencial de velocidade entre as rodas.
+  - **Curvas (pivô):** `sync_corr += yawError * IMU_KP_PIVO` — reforça o critério de parada por Yaw; a curva encerra quando `|yawError| ≥ (ânguloAlvo − 2°)`.
+- **Acelerômetro:** Inicializado e lido pelo driver (ODR 100 Hz, faixa ±4 g), mas seus dados não são utilizados no controle atual. Disponível para fusão sensorial futura (estimativa de inclinação ou detecção de colisão).
 
 ---
 

@@ -39,7 +39,49 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 4. Resumo da Estrutura Atual do Repositório
-* **`firmware_robo2wd_v3/`:** **Versão Oficial Atual e Ativa.**
+### 4. Etapa 4: Integração da IMU Bosch BMI160 (10/11/2026 — commit `032dc0e`)
+* **Motivação:** Movimentos em linha reta apresentavam desvio acumulativo que a sincronização por encoder não conseguia compensar completamente. As curvas de pivô dependiam exclusivamente de tempo morto estimado.
+* **Remapeamento de Hardware:**
+  * Encoder esquerdo migrado de GPIO 23/22 → **GPIO 16/17**, liberando o barramento I2C (GPIO 21/22) para a IMU.
+* **Driver `imu_bmi160.h` criado:**
+  * Comunicação I2C nativa a 400 kHz (sem biblioteca externa).
+  * Inicialização do giroscópio (modo normal, ODR 100 Hz, faixa ±250°/s) e do acelerômetro (modo normal, ODR 100 Hz, faixa ±4g).
+  * Calibração estática de *bias* do giroscópio (`calibrarGiroscopio()`) com média de 500 amostras em repouso.
+  * Integração de ângulo de guinada (Yaw) via `atualizarYaw()` com `dt` medido em microssegundos.
+  * Funções `resetYaw()` e `getYawAngleDeg()` para uso pela FSM.
+* **Integração no firmware V3:**
+  * Correção de rumo em retas via `IMU_KP_YAW_RETA` (ganho proporcional sobre o erro de Yaw).
+  * Critério de parada de curva substituído de temporizador por limiar de Yaw integrado.
+
+---
+
+### 5. Etapa 5: Calibração de Polaridade do Eixo Z (10/11/2026 — commit `969d368`)
+* **Problema:** Sem calibração de polaridade, a correção de rumo operava na direção errada — amplificando o desvio em vez de corrigi-lo.
+* **Procedimento:** Utilitário `calib_imu_polaridade/calib_imu_polaridade.ino` executado com giro manual no sentido horário.
+  * Resultado: Eixo Z bruto reportava valor **NEGATIVO** para giro horário (convenção oposta ao esperado).
+* **Correção aplicada:** Leitura invertida `-readRawGyroZ()` no driver (tanto em `calibrarGiroscopio()` quanto em `atualizarYaw()`), estabelecendo a convenção: **giro horário = Yaw positivo**.
+* **Ajuste de ganho:** `IMU_KP_YAW_RETA` reduzido de `1.2f` → `0.6f` para evitar oscilação no controle de rumo (sobreposição com sincronismo de encoders).
+
+---
+
+### 6. Etapa 6: Correções Lógicas de `yawError` e `IMU_KP_PIVO` (11/11/2026 — commit `bc36eef`)
+* **Problema raiz identificado:** A instrução `float yawAtual = abs(imu.getYawAngleDeg())` descartava o sinal do ângulo, provocando:
+  1. **Retas:** A correção de rumo era aplicada na direção **errada** (sempre "corrigia" como se o robô estivesse desviando para a mesma direção, independentemente do desvio real).
+  2. **Curvas:** O progresso do pivô era subestimado (ângulo absoluto ≠ ângulo relativo ao início da curva), fazendo o robô girar além ou aquém dos 90°.
+* **Solução — variável `g_yawRef`:**
+  * Declarada globalmente: `float g_yawRef = 0.0f;`
+  * Capturada em `iniciarMovimentoReta()` e `iniciarMovimentoCurva()` **após** `imu.resetYaw()`: `g_yawRef = imu.getYawAngleDeg();`
+  * Erro relativo calculado como: `float yawError = yawAtual - g_yawRef;` (preserva sinal).
+* **`IMU_KP_PIVO` agora funcional:** Anteriormente definido em `config.h` mas sem efeito (placeholder). Agora aplicado em `processarControleMovimento()`: `sync_corr += yawError * IMU_KP_PIVO;`
+* **Critério de parada de curva atualizado:** `yawAbs >= (g_anguloTotalGraus - 2.0f)` — tolerância de 2° previne loop infinito por latência de leitura.
+* **Acelerômetro:** Configurado e lido pelo driver, dados disponíveis mas não utilizados no controle atual (reservado para fusão sensorial futura).
+* **Compilação:** ✅ 317.328 bytes (24% flash), 23.756 bytes RAM. Gravado em COM9.
+
+---
+
+### 7. Resumo da Estrutura Atual do Repositório
+* **`firmware_robo2wd_v3/`:** **Versão Oficial Atual e Ativa** (com IMU BMI160 integrada e funcional).
 * **`legacy/`:** Contém as implementações históricas `firmware_robo2wd/` (V1) e `firmware_robo2wd_v2/` (V2).
 * **`diag_pcnt/`:** Ferramenta oficial de diagnóstico e validação dos encoders via PCNT em hardware.
+* **`diag_i2c_bmi160/`:** Utilitário de diagnóstico do barramento I2C e leitura da IMU BMI160 (Chip ID, giroscópio e acelerômetro).
+* **`calib_imu_polaridade/`:** Ferramenta de validação da polaridade do eixo Z da IMU (confirma convenção horário=positivo).

@@ -1,3 +1,11 @@
+// =============================================================================
+// ATENÇÃO: Este utilitário usa o pinout original da Versão 1 (V1) do projeto:
+//   Encoder Esquerdo: GPIO 23 (Fase A) e GPIO 22 (Fase B)
+// No firmware oficial V3, o encoder esquerdo foi remapeado para GPIO 16/17
+// para liberar o barramento I2C (GPIO 21/22) para a IMU BMI160.
+// Este arquivo é mantido apenas para fins históricos — NÃO é compatível com V3.
+// =============================================================================
+
 #include <Arduino.h>
 
 // Pinos dos Encoders conforme especificação
