@@ -72,14 +72,20 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
   * `imu.resetYaw()` é chamado no início de cada segmento (reta ou curva) e zera o ângulo de yaw.
   * O erro relativo é o próprio yaw medido: `float yawError = yawAtual;` (preserva o sinal, pois o reset garante a referência zero).
   * A variável intermediária `g_yawRef` foi removida por ser redundante (o `resetYaw()` já zera o ângulo).
-* **`IMU_KP_PIVO` agora funcional:** Anteriormente definido em `config.h` mas sem efeito (placeholder). Agora aplicado em `processarControleMovimento()`: `sync_corr += yawError * IMU_KP_PIVO;`
+* **`IMU_KP_PIVO` (removido na Etapa 7):** Tinha sido aplicado como `sync_corr += yawError * IMU_KP_PIVO;`, mas o termo era redundante e causava translação no pivô — ver Etapa 7.
 * **Critério de parada de curva atualizado:** `yawAbs >= (g_anguloTotalGraus - 2.0f)` — tolerância de 2° previne loop infinito por latência de leitura.
 * **Acelerômetro:** Configurado pelo driver (ODR 100 Hz, ±2 g), mas não lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura. Dados disponíveis para fusão sensorial futura.
 * **Compilação:** ✅ 317.328 bytes (24% flash), 23.756 bytes RAM. Gravado em COM9.
 
 ---
 
-### 7. Resumo da Estrutura Atual do Repositório
+### 7. Etapa 7: Remoção da correção de yaw no pivô (11/11/2026)
+* **Problema:** O termo `sync_corr += yawError * IMU_KP_PIVO` era aplicado em modo comum (o mesmo sinal nos dois motores). Em um pivô, isso não altera a taxa de rotação (a diferença entre as rodas permanece) e causa uma translação proporcional ao yaw — o robô derivava durante a curva.
+* **Correção:** Termo removido e `IMU_KP_PIVO` eliminado de `config.h`. A IMU continua atuando no pivô pelo critério de parada (`|yawError| ≥ (ânguloAlvo − 2°)`) e pelo mapeamento do perfil trapezoidal.
+
+---
+
+### 8. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v3/`:** **Versão Oficial Atual e Ativa** (com IMU BMI160 integrada e funcional).
 * **`legacy/`:** Contém as implementações históricas `firmware_robo2wd/` (V1) e `firmware_robo2wd_v2/` (V2).
 * **`diag_pcnt/`:** Ferramenta oficial de diagnóstico e validação dos encoders via PCNT em hardware.

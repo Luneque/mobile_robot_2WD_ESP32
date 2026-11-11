@@ -255,14 +255,10 @@ void processarControleMovimento(uint32_t now) {
         float out1 = pid1.compute(targetRpmM1, rpm1, dt);
         float out2 = pid2.compute(targetRpmM2, rpm2, dt);
 
-        // Sincronismo Cruzado em Pivô + Correção de Yaw via IMU (IMU_KP_PIVO)
+        // Sincronismo Cruzado em Pivô (apenas encoders):
+        // A IMU já atua no pivô pelo critério de parada e pelo mapeamento do perfil trapezoidal.
         float sync_error_pivot = (float)(t1 - t2);
         float sync_corr = sync_error_pivot * K_SYNC;
-
-        // Aplica correção de yaw da IMU no pivô: yawError sinalizado indica desvio de trajetória
-        if (imu.isInitialized()) {
-            sync_corr += yawError * IMU_KP_PIVO;
-        }
 
         if (sync_corr > 35.0f) sync_corr = 35.0f;
         if (sync_corr < -35.0f) sync_corr = -35.0f;

@@ -71,7 +71,6 @@
 // ==========================================
 #define IMU_HABILITADA     true     // Habilita a correcao por giroscopio // Flag reservado para futuro toggle de habilitação da IMU (atualmente sempre true)
 #define IMU_KP_YAW_RETA    0.6f     // Ganho amortecido para manter rumo estavel sem entrar em conflito com encoders
-#define IMU_KP_PIVO        0.8f     // Ganho proporcional de correção de yaw durante pivô (aplicado em: sync_corr += yawError * IMU_KP_PIVO)
 #define CONTROL_LOOP_MS    20       // Período de amostragem do loop de controle (20ms = 50Hz)
 
 // ==========================================
