@@ -3,20 +3,21 @@
 ---
 
 > [!IMPORTANT]
-> **Versão Oficial Atual: Versão 3 (`firmware_robo2wd_v3/`)**  
-> As implementações anteriores (Versão 1 baseada em interrupções por software e Versão 2 baseada em loops bloqueantes) foram arquivadas no diretório [`legacy/`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/legacy/) para fins de histórico e rastreabilidade técnica.
+> **Versão Oficial Atual: Versão 4 (`firmware_robo2wd_v4/`)**  
+> As implementações anteriores (Versão 1 por software, Versão 2 bloqueante e Versão 4 com fio/serial) foram arquivadas no diretório [`legacy/`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/legacy/) para histórico de engenharia e rastreabilidade técnica.
 
 ---
 
 ## 1. Apresentação do Projeto
 
-Este projeto consiste em uma plataforma robótica móvel de tração diferencial (2WD) baseada no microcontrolador **ESP32-D0WD-V3**. O sistema executa trajetórias de alta precisão com realimentação em malha fechada (PID), perfil de velocidade trapezoidal e sincronismo dinâmico entre rodas (*cross-coupling*).
+Este projeto consiste em uma plataforma robótica móvel de tração diferencial (2WD) baseada no microcontrolador **ESP32-D0WD-V3**. O sistema executa trajetórias de alta precisão com realimentação em malha fechada (PID), perfil de velocidade trapezoidal, compensação de zona morta por feedforward e sincronismo dinâmico entre rodas (*cross-coupling*), integrado com uma IMU Bosch BMI160.
 
-A versão oficial do firmware (**Versão 3**) opera com:
+A versão oficial do firmware (**Versão 4**) opera com:
+* **Conectividade Sem Fio e Telemetria em Tempo Real:** Wi-Fi Station, WebSocket Server a 5 Hz e Dashboard Web embarcado em memória flash (servido em `http://robo.local/`), permitindo visualização de gráficos de alta frequência e disparo remoto sem cabos.
+* **Gateway ESP-NOW:** Suporte ao microcontrolador auxiliar ESP32-S3 Super Mini para transmissão de telemetria sem necessidade de ponto de acesso Wi-Fi.
 * **Periféricos de Silício Dedicados:** **MCPWM** (50 Hz / resolução de $1\,\mu\text{s}$) e **PCNT** (decodificação de quadratura 4x por hardware com filtro anti-glitch de 1000 ns).
-* **Máquina de Estados Não-Bloqueante:** Execução orientada a tempo no `loop()`, liberando o microcontrolador para tarefas futuras (sensores, telemetria e conectividade).
-* **Perfil Trapezoidal de Velocidade:** Rampas ágeis de aceleração e desaceleração, permitindo velocidade de cruzeiro de **80 RPM ($\approx 293\text{ mm/s}$)** sem derrapagem.
-* **Segurança Ativa e Hardware Watchdog:** Task Watchdog Timer do ESP32 (`esp_task_wdt`) de 3 segundos e detecção de roda travada (*stall*) em retas e curvas pivô.
+* **Compensação Dinâmica de Zona Morta:** Feedforward calibrado em `110 µs` (`ESC_DEADBAND_US`), vencendo o atrito estático imediatamente na partida.
+* **Fusão Sensorial com IMU BMI160:** Correção contínua de rumo em linha reta (`IMU_KP_YAW_RETA = 1.2`) e controle estrito de parada de giro pivô por integração giroscópica de 90°.
 
 ---
 
@@ -81,17 +82,17 @@ $$\text{PPR}_{\text{efetivo}} = 12 \text{ PPR} \times 90 \text{ (Redução)} \ti
 
 ---
 
-## 4. Arquitetura de Software da Versão 3 (Oficial)
+## 4. Arquitetura de Software da Versão 4 (Oficial)
 
-A estrutura oficial reside em [`firmware_robo2wd_v3/`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v3/):
+A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/):
 
 ### 4.1 Módulos do Sistema
-* **[`config.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v3/config.h):** Centraliza pinos, limites de pulso do ESC ($1150\,\mu\text{s}$ a $1850\,\mu\text{s}$), parâmetros cinemáticos, distâncias de rampa, parâmetros do WDT e ganhos de fusão com a IMU (`IMU_KP_YAW_RETA`).
-* **[`imu_bmi160.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v3/imu_bmi160.h):** Driver nativo I2C (400 kHz) para a IMU Bosch BMI160. Fornece calibração estática de *bias* do giroscópio, inversão de polaridade (giro horário = Yaw positivo) e integração de ângulo de guinada (*Yaw*). O firmware usa `yawError = yawAtual` (erro relativo ao início de cada segmento, pois `resetYaw()` zera o ângulo) para correção de rumo em retas (`IMU_KP_YAW_RETA = 0.6`). No pivô, a IMU atua pelo critério de parada (`|yawError| ≥ (ânguloAlvo − 2°)`) e pelo mapeamento do perfil trapezoidal; o sincronismo cruzado é feito apenas pelos encoders. O acelerômetro é inicializado pelo driver (ODR 100 Hz, ±2 g), mas não é lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura.
-* **[`motor_control_mcpwm.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v3/motor_control_mcpwm.h):** Gerador determinístico de PWM a 50 Hz com resolução de $1\,\mu\text{s}$ via timer de 1 MHz.
-* **[`encoder_reader_pcnt.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v3/encoder_reader_pcnt.h):** Decodificador de pulsos com filtro anti-glitch de 1000 ns e filtro exponencial de velocidade (EMA).
-* **[`pid_controller.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v3/pid_controller.h):** Controlador PID com anti-windup e feedforward dinâmico de zona morta ($\pm 50\,\mu\text{s}$).
-* **[`firmware_robo2wd_v3.ino`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v3/firmware_robo2wd_v3.ino):** Máquina de estados não-bloqueante (`ESTADO_AGUARDO_INICIO`, `ESTADO_EXECUTANDO_TRAJETORIA`, `ESTADO_CONCLUIDO`, `ESTADO_EMERGENCIA`), perfil trapezoidal e fusão sensorial IMU + Encoders.
+* **[`config.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/config.h):** Centraliza pinos, limites de pulso do ESC ($11110\,\mu\text{s}$ a $18110\,\mu\text{s}$), parâmetros cinemáticos, distâncias de rampa, parâmetros do WDT e ganhos de fusão com a IMU (`IMU_KP_YAW_RETA`).
+* **[`imu_bmi160.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/imu_bmi160.h):** Driver nativo I2C (400 kHz) para a IMU Bosch BMI160. Fornece calibração estática de *bias* do giroscópio, inversão de polaridade (giro horário = Yaw positivo) e integração de ângulo de guinada (*Yaw*). O firmware usa `yawError = yawAtual` (erro relativo ao início de cada segmento, pois `resetYaw()` zera o ângulo) para correção de rumo em retas (`IMU_KP_YAW_RETA = 1.2`). No pivô, a IMU atua pelo critério de parada (`|yawError| ≥ (ânguloAlvo − 2°)`) e pelo mapeamento do perfil trapezoidal; o sincronismo cruzado é feito apenas pelos encoders. O acelerômetro é inicializado pelo driver (ODR 100 Hz, ±2 g), mas não é lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura.
+* **[`motor_control_mcpwm.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/motor_control_mcpwm.h):** Gerador determinístico de PWM a 50 Hz com resolução de $1\,\mu\text{s}$ via timer de 1 MHz.
+* **[`encoder_reader_pcnt.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/encoder_reader_pcnt.h):** Decodificador de pulsos com filtro anti-glitch de 1000 ns e filtro exponencial de velocidade (EMA).
+* **[`pid_controller.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/pid_controller.h):** Controlador PID com anti-windup e feedforward dinâmico de zona morta ($\pm 110\,\mu\text{s}$).
+* **[`firmware_robo2wd_v4.ino`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/firmware_robo2wd_v4.ino):** Máquina de estados não-bloqueante (`ESTADO_AGUARDO_INICIO`, `ESTADO_EXECUTANDO_TRAJETORIA`, `ESTADO_CONCLUIDO`, `ESTADO_EMERGENCIA`), perfil trapezoidal e fusão sensorial IMU + Encoders.
 
 ### 4.2 Dinâmica do Perfil Trapezoidal
 * **Reta (500 mm):**
@@ -117,12 +118,12 @@ A estrutura oficial reside em [`firmware_robo2wd_v3/`](file:///C:/Users/luneque.
 
 ## 6. Procedimento de Compilação e Gravação
 
-### 6.1 Compilação da Versão 3
+### 6.1 Compilação da Versão 4
 ```powershell
-& "C:\Program Files\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe" compile --fqbn esp32:esp32:esp32 --export-binaries "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v3"
+& "C:\Program Files\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe" compile --fqbn esp32:esp32:esp32 --export-binaries "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4"
 ```
 
 ### 6.2 Gravação via `esptool.py` (fechar o monitor serial antes)
 ```powershell
-& "C:\Users\luneque.junior\AppData\Local\Arduino15\packages\esp32\tools\esptool_py\5.3.1\esptool.exe" --chip esp32 --port COM9 --baud 921600 --before default-reset --after hard-reset write_flash -z --flash-mode dio --flash-freq 80m --flash-size 4MB 0x1000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v3\build\esp32.esp32.esp32\firmware_robo2wd_v3.ino.bootloader.bin" 0x8000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v3\build\esp32.esp32.esp32\firmware_robo2wd_v3.ino.partitions.bin" 0xe000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v3\build\esp32.esp32.esp32\boot_app0.bin" 0x10000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v3\build\esp32.esp32.esp32\firmware_robo2wd_v3.ino.bin"
+& "C:\Users\luneque.junior\AppData\Local\Arduino15\packages\esp32\tools\esptool_py\5.3.1\esptool.exe" --chip esp32 --port COM9 --baud 921600 --before default-reset --after hard-reset write_flash -z --flash-mode dio --flash-freq 80m --flash-size 4MB 0x1000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.bootloader.bin" 0x8000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.partitions.bin" 0xe000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\boot_app0.bin" 0x10000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.bin"
 ```

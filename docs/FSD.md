@@ -8,7 +8,7 @@
 | :--- | :--- |
 | **Título** | FSD — Firmware Final de Controle de Trajetória para Robô Diferencial 2WD (MCPWM + PCNT) |
 | **Status** | Aprovado e Homologado |
-| **Versão Oficial Homologada** | **3.0.0 (MCPWM + PCNT Hardware + FSM Não-Bloqueante + Perfil Trapezoidal)** |
+| **Versão Oficial Homologada** | **4.0.0 (Wi-Fi WebSocket Telemetry + Dashboard PROGMEM + ESP-NOW Gateway)** |
 | **Versões Legadas** | v1.0.0 (LEDC/Software ISRs) e v2.0.0 (MCPWM/PCNT Bloqueante) movidas para `legacy/` |
 | **Data** | 10/11/2026 |
 | **Autor/Responsável** | Engenharia de Firmware & Controle |
@@ -20,7 +20,7 @@
 #### 2.1 Descrição Geral
 O projeto consiste no desenvolvimento e homologação do firmware embarcado para um robô móvel de tração diferencial (2WD) baseado no microcontrolador **ESP32-D0WD-V3**. O sistema executa com alta precisão e repetibilidade uma trajetória geométrica quadrada fechada de 4 lados (500 mm por lado com curvas pivô de 90° sobre o próprio eixo), empregando controle de velocidade em malha fechada (PID), sincronismo dinâmico entre rodas (*cross-coupling*), rampa de aceleração/desaceleração trapezoidal e leitura de encoders em quadratura 4x.
 
-#### 2.2 Pilares Tecnológicos da Versão 3 (Oficial)
+#### 2.2 Pilares Tecnológicos da Versão 4 (Oficial)
 1. **Periférico PCNT (Pulse Counter):** Decodifica por hardware a quadratura 4x dos encoders com filtros digitais anti-ruído (*glitch filters* de 1000 ns), eliminando qualquer sobrecarga de CPU.
 2. **Periférico MCPWM (Motor Control PWM):** Gera pulsos de controle para o ESC a 50 Hz com resolução de $1\,\mu\text{s}$ via timer dedicado de 1 MHz.
 3. **Máquina de Estados Não-Bloqueante (FSM):** Toda a lógica opera orientada a tempo no `loop()`, permitindo integração com sensores futuros e comunicação sem loops de espera com `delay()`.
@@ -145,4 +145,4 @@ stateDiagram-v2
 
 * **v1.0.0 (Legado - `legacy/firmware_robo2wd/`):** Utilizava PWM via LEDC e leitura de encoders por interrupções de software (`attachInterrupt`). Apresentava gargalo de CPU e perda de pulsos.
 * **v2.0.0 (Legado - `legacy/firmware_robo2wd_v2/`):** Migrou para MCPWM e PCNT em hardware, comprovando a redução real de 1:90 ($4.320\text{ pulsos/volta}$) e introduzindo o sincronismo cruzado. Execução em loops bloqueantes dentro do `setup()`.
-* **v3.0.0 (OFICIAL - `firmware_robo2wd_v3/`):** Arquitetura definitiva não-bloqueante no `loop()`, perfil trapezoidal de velocidade otimizado para 80 RPM, Task Watchdog Timer reconfigurado e checagem de stall em retas e curvas.
+* **v3.0.0 (OFICIAL - `firmware_robo2wd_v4/`):** Arquitetura definitiva não-bloqueante no `loop()`, perfil trapezoidal de velocidade otimizado para 80 RPM, Task Watchdog Timer reconfigurado e checagem de stall em retas e curvas.

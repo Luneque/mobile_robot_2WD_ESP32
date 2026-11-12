@@ -85,9 +85,30 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 8. Resumo da Estrutura Atual do Repositório
-* **`firmware_robo2wd_v3/`:** **Versão Oficial Atual e Ativa** (com IMU BMI160 integrada e funcional).
-* **`legacy/`:** Contém as implementações históricas `firmware_robo2wd/` (V1) e `firmware_robo2wd_v2/` (V2).
-* **`diag_pcnt/`:** Ferramenta oficial de diagnóstico e validação dos encoders via PCNT em hardware.
-* **`diag_i2c_bmi160/`:** Utilitário de diagnóstico do barramento I2C e leitura da IMU BMI160 (Chip ID, giroscópio e acelerômetro).
-* **`calib_imu_polaridade/`:** Ferramenta de validação da polaridade do eixo Z da IMU (confirma convenção horário=positivo).
+### 8. Etapa 8: Versão 4 — Conectividade Sem Fio, Dashboard Web e Otimização Dinâmica (12/11/2026 — commits `e6c03f0`, `9e2682d`)
+* **Motivação:** A dependência do cabo serial USB limitava testes com o robô em solo livre e impedia análise gráfica contínua de variáveis de controle (RPM, Yaw, PWM e Ticks).
+* **Desenvolvimento da Versão 4 (`firmware_robo2wd_v4/`):**
+  * **Driver `wifi_telemetry.h`:** Integração do rádio Wi-Fi (modo Station na rede local) com servidor HTTP (porta 80), mDNS (`http://robo.local/`) e servidor WebSocket assíncrono (porta 81).
+  * **Dashboard Web Embarcado:** Interface HTML/JS com dark theme em memória flash (PROGMEM), renderizando gráficos em tempo real com Chart.js (janela de 15s), botões de comando remoto (**START**) e exportação instantânea de dados em CSV.
+  * **Partida Remota Segura:** O robô pode ser disparado remotamente pelo navegador via WebSocket sem cabo de dados conectado.
+  * **Ponte ESP-NOW (`gateway_espnow/`):** Firmware dedicado para o microcontrolador ESP32-S3 Super Mini para permitir telemetria transparente via rádio 2.4 GHz em campo aberto sem roteador Wi-Fi.
+  * **Ferramenta PC (`robo_monitor/`):** Script `robo_ws_logger.py` para monitoramento no terminal via biblioteca `rich` e salvamento automático de logs em CSV.
+* **Calibração Dinâmica Pós-Telemetria em Solo:**
+  * **Problema diagnosticado no CSV 1:** O robô ficava ~3,0 s parado no início de cada reta vencendo atrito estático com o feedforward original de 50 µs (`ESC_DEADBAND_US`).
+  * **Ajuste aplicado:** Feedforward de zona morta elevado para `110.0 µs` (`ESC_DEADBAND_US`), rompendo o atrito estático no ciclo zero (t=0) e reduzindo o tempo de reta de ~7,6 s para ~3,8 s.
+  * **Controle Angular Reforçado:** Ganho proporcional de Yaw em retas aumentado de `0.6` para `1.2` (`IMU_KP_YAW_RETA`) e sincronismo de encoders aumentado para `0.08` (`K_SYNC`), reduzindo o desvio angular para menos de 2°.
+* **Resultados Homologados:** O robô executou o quadrado completo de 4 lados e 4 curvas com arrancada imediata, fechamento perfeito do percurso e telemetria 100% gravada sem perdas.
+
+---
+
+### 9. Resumo da Estrutura Atual do Repositório
+* **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
+* **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
+* **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.
+* **`legacy/`:** Contém as versões históricas preservadas:
+  * `firmware_robo2wd/` (Versão 1 — software ISRs);
+  * `firmware_robo2wd_v2/` (Versão 2 — hardware bloqueante);
+  * `firmware_robo2wd_v3/` (Versão 3 — FSM não-bloqueante + IMU com fio).
+* **`diag_pcnt/`:** Utilitário oficial de diagnóstico e validação dos encoders em hardware.
+* **`diag_i2c_bmi160/`:** Utilitário de diagnóstico I2C da IMU Bosch BMI160.
+* **`calib_imu_polaridade/`:** Ferramenta de validação da polaridade do eixo Z da IMU.
