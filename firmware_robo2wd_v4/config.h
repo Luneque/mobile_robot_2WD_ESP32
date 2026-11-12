@@ -46,7 +46,7 @@
 // Limites em microssegundos (us)
 #define ESC_NEUTRO_US      1500     // Ponto neutro (motor parado)
 #define ESC_ARM_TEMPO_MS   3000     // Tempo segurando neutro no boot para armar o ESC
-#define ESC_DEADBAND_US    50.0f    // Feedforward de compensação de zona morta do ESC
+#define ESC_DEADBAND_US    110.0f   // Feedforward de compensação de zona morta do ESC (ajustado de 50 para 110us)
 
 // Limites seguros operacionais
 #define ESC_MIN_US         1150     // Potência máxima permitida em ré
@@ -64,13 +64,13 @@
 #define PID_KD_M2          0.02f
 
 // Ganho de sincronismo cruzado entre rodas (Cross-Coupling Synchronization)
-#define K_SYNC             0.05f
+#define K_SYNC             0.08f
 
 // ==========================================
 // 4.1 FUSÃO SENSORIAL E CONTROLE ANGULAR COM IMU (BMI160)
 // ==========================================
 #define IMU_HABILITADA     true     // Habilita a correcao por giroscopio
-#define IMU_KP_YAW_RETA    0.6f     // Ganho amortecido para manter rumo estavel sem entrar em conflito com encoders
+#define IMU_KP_YAW_RETA    1.2f     // Ganho reforcado para manter rumo estavel em linha reta
 #define CONTROL_LOOP_MS    20       // Período de amostragem do loop de controle (20ms = 50Hz)
 
 // ==========================================
