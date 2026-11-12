@@ -99,10 +99,10 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
   * Acelera de 20 RPM até **55 RPM** nos primeiros **50 mm** ($\approx 600\text{ mm/s}^2$).
   * Mantém velocidade de cruzeiro estável por **390 mm** (78% da reta).
   * Desacelera nos últimos **60 mm** para parada cravada na marca de 500 mm.
-  * Tempo total por reta: **$\approx 1,88\text{ s}$**.
+  * Tempo total por reta: **$\approx 2,50\text{ s}$** (em 55 RPM).
 * **Curva Pivô (90°):**
   * Acelera em 10° e desacelera em 15°, mantendo cruzeiro de **50 RPM** em 65° do giro.
-  * Tempo total por giro: **$\approx 0,52\text{ s}$**.
+  * Tempo total por giro: **$\approx 1,80\text{ s}$** (com parada precisa a 89° e pausa).
 
 ---
 

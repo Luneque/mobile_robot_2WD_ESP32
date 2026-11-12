@@ -101,7 +101,22 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 9. Resumo da Estrutura Atual do Repositório
+### 9. Etapa 9: Refinamento Físico de Polaridade, Fechamento de Pivô a 90° e Cruzeiro (12/11/2026 — commits `4b24c2e`, `77339d5`)
+* **Correção Crítica da Polaridade de Yaw (`imu_bmi160.h`):**
+  * Verificou-se que a inversão manual `-readRawGyroZ()` gerava sinal negativo para giro à direita (horário), gerando realimentação positiva em retas.
+  * Restaurada a leitura direta `readRawGyroZ()`, restabelecendo a convenção: **giro horário = Yaw positivo (+)** e realimentação negativa estável.
+* **Calibração da Tolerância de Pivô para 90,0° Real:**
+  * O critério de corte foi ajustado de 88,0° para **89,0°** (`yawAbs >= (g_anguloTotalGraus - 1.0f)`).
+  * Com a desaceleração inercial durante a pausa de 800 ms, o robô passou a parar cravado em **+89,1° a +90,2°** (erro médio < 0,55° por curva).
+* **Calibração Realista do Cruzeiro (55 RPM):**
+  * Redefinido `VELOCIDADE_CRUZEIRO_RPM` de 80 RPM para **55 RPM (~201 mm/s)**, alinhado à curva de torque/tensão da bateria 2S e caixa 1:90 em retas de 500 mm.
+  * O erro de velocidade em regime foi zerado e a diferença residual entre as rodas caiu para menos de 90 ticks (< 4 mm).
+* **Parada Remota via WebSocket:** Implementado tratamento para comandos de parada imediata (`stop` / `pause`).
+* **Padronização JSON Numérico:** Os campos `yaw`, `r1`, `r2` e `rt` foram convertidos para tipos numéricos puros no payload JSON do WebSocket.
+
+---
+
+### 10. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.
