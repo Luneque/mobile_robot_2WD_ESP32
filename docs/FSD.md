@@ -10,7 +10,7 @@
 | **Status** | Aprovado e Homologado |
 | **Versão Oficial Homologada** | **4.0.0 (Wi-Fi WebSocket Telemetry + Dashboard PROGMEM + ESP-NOW Gateway)** |
 | **Versões Legadas** | v1.0.0 (LEDC/Software ISRs) e v2.0.0 (MCPWM/PCNT Bloqueante) movidas para `legacy/` |
-| **Data** | 10/11/2026 |
+| **Data** | 12/11/2026 |
 | **Autor/Responsável** | Engenharia de Firmware & Controle |
 
 ---
@@ -27,13 +27,20 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 4. **Perfil de Velocidade Trapezoidal:** Rampas progressivas de aceleração (50 mm) e desaceleração (60 mm), eliminando derrapagens (*wheel slip*) e permitindo velocidade de cruzeiro de **80 RPM** ($\approx 293\text{ mm/s}$).
 5. **Segurança Ativa e Hardware Watchdog:**
    * Detecção de desbalanceamento e stall em retas e curvas pivô.
-   * Task Watchdog Timer do ESP32 (`esp_task_wdt`) ativo e reconfigurado para 3 segundos.
+   * Task Watchdog Timer do ESP32 (`esp_task_wdt`) ativo e reconfigurado para 5 segundos.
    * Validação estrita no boot com bloqueio seguro caso algum periférico falhe.
 
-#### 2.3 Escopo da Versão
-- Controle remoto por telecomando (Wi-Fi, Bluetooth ou rádio RC).
-- Navegação autônoma em mapa dinâmico (SLAM) e desvio de obstáculos.
-- Integração de IMU BMI160 (giroscópio + acelerômetro) para correção de rumo e parada de pivô.
+#### 2.3 Escopo da Versão 4.0
+- **Dentro do Escopo:**
+  - Trajetória quadrada de 4 lados (500 mm) e curvas pivô de 90° orientadas por IMU.
+  - Conectividade Wi-Fi Station com telemetria WebSocket assíncrona a 5 Hz.
+  - Dashboard Web embarcado em PROGMEM com gráficos em tempo real e exportação CSV.
+  - Partida remota via WebSocket (botão START no navegador).
+  - Compensação calibrada de zona morta por feedforward (110 µs).
+  - Firmware de gateway para ESP32-S3 Super Mini (gateway_espnow/).
+- **Fora do Escopo Atual (Versões Futuras):**
+  - Navegação autônoma em mapa dinâmico (SLAM), LiDAR e desvio de obstáculos.
+  - Envio direto por ESP-NOW no robô (planejado para v4.1 como redundância ao Wi-Fi).
 
 ---
 
@@ -53,7 +60,7 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
   - **Sinal Neutro (Parado):** $1500\,\mu\text{s}$.
   - **Faixa de Avanço:** $1501\,\mu\text{s}$ a $1850\,\mu\text{s}$ (máximo calibrado).
   - **Faixa de Ré:** $1150\,\mu\text{s}$ (máximo calibrado) a $1499\,\mu\text{s}$.
-  - **Zona Morta do ESC (*Deadband*):** $\approx \pm 50\,\mu\text{s}$ (compensada via Feedforward).
+  - **Zona Morta do ESC (*Deadband*):** $\approx \pm 110\,\mu\text{s}$ (compensada via Feedforward).
 
 #### 3.3 Sensores de Realimentação (Encoders)
 - **Tipo:** Encoders magnéticos de efeito Hall montados no eixo traseiro dos motores.
@@ -94,7 +101,7 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 
 ---
 
-### 5. Parâmetros Calibrados e Homologados (v3.0.0)
+### 5. Parâmetros Calibrados e Homologados (v4.0.0)
 
 | Parâmetro | Macro no Código | Valor Homologado | Efeito Funcional |
 | :--- | :--- | :---: | :--- |

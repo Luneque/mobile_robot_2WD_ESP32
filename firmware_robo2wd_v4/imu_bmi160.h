@@ -69,8 +69,8 @@ public:
         if (!_initialized) return;
         float sum = 0.0f;
         for (uint16_t i = 0; i < samples; i++) {
-            // Eixo Z invertido (-) para que giro a DIREITA (Horario) gere valor POSITIVO (+)
-            float gz = -readRawGyroZ();
+            // Leitura direta do eixo Z para que giro a DIREITA (Horario) gere valor POSITIVO (+)
+            float gz = readRawGyroZ();
             sum += gz;
             delay(5);
         }
@@ -81,8 +81,8 @@ public:
     void update(float dt_sec) {
         if (!_initialized) return;
 
-        // Inversao calibrada: giro para a DIREITA (horario) = positivo (+)
-        float rawGz = -readRawGyroZ();
+        // Convencao: giro para a DIREITA (horario) = positivo (+)
+        float rawGz = readRawGyroZ();
         _currentYawRateDps = rawGz - _gzOffset;
 
         // Zona morta de ruído (evita drift quando parado)

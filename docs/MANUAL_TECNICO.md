@@ -4,7 +4,7 @@
 
 > [!IMPORTANT]
 > **Versão Oficial Atual: Versão 4 (`firmware_robo2wd_v4/`)**  
-> As implementações anteriores (Versão 1 por software, Versão 2 bloqueante e Versão 4 com fio/serial) foram arquivadas no diretório [`legacy/`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/legacy/) para histórico de engenharia e rastreabilidade técnica.
+> As implementações anteriores (Versão 1 por software, Versão 2 bloqueante e Versão 3 com fio/serial) foram arquivadas no diretório [`legacy/`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/legacy/) para histórico de engenharia e rastreabilidade técnica.
 
 ---
 

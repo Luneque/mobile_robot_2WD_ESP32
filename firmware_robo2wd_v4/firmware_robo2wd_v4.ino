@@ -301,10 +301,26 @@ void enviarTelemetria(uint32_t now) {
     // Determina estado como string
     const char* estadoStr = "AGUARDO";
     if (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA) estadoStr = g_emLinhaReta ? "RETA" : "PIVO";
-    else if (estadoAtual == ESTADO_CONCLUIDO)         estadoStr = "CONCLUIDO";
-    else if (estadoAtual == ESTADO_EMERGENCIA)        estadoStr = "EMERGENCIA";
-    else if (estadoAtual == ESTADO_FALHA_HARDWARE)    estadoStr = "FALHA";
-    else if (estadoAtual == ESTADO_ARMANDO_ESC)       estadoStr = "ARMANDO";
+    else if (estadoAtual == ESTADO_CONCLUIDO) {
+        estadoStr = "CONCLUIDO";
+        rpm1 = 0.0f; // Zera leitura residual do filtro EMA com motor parado
+        rpm2 = 0.0f;
+    }
+    else if (estadoAtual == ESTADO_EMERGENCIA) {
+        estadoStr = "EMERGENCIA";
+        rpm1 = 0.0f;
+        rpm2 = 0.0f;
+    }
+    else if (estadoAtual == ESTADO_FALHA_HARDWARE) {
+        estadoStr = "FALHA";
+        rpm1 = 0.0f;
+        rpm2 = 0.0f;
+    }
+    else if (estadoAtual == ESTADO_ARMANDO_ESC) {
+        estadoStr = "ARMANDO";
+        rpm1 = 0.0f;
+        rpm2 = 0.0f;
+    }
 
     TelemetryPacket pkt;
     pkt.ts         = now;
