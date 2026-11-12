@@ -302,15 +302,15 @@ public:
         doc["st"]  = pkt.estado;
         doc["sd"]  = pkt.lado;
         doc["of"]  = pkt.totalLados;
-        doc["yaw"] = serialized(String(pkt.yaw,  2));
-        doc["r1"]  = serialized(String(pkt.rpm1, 1));
-        doc["r2"]  = serialized(String(pkt.rpm2, 1));
+        doc["yaw"] = roundf(pkt.yaw * 100.0f) / 100.0f;
+        doc["r1"]  = roundf(pkt.rpm1 * 10.0f) / 10.0f;
+        doc["r2"]  = roundf(pkt.rpm2 * 10.0f) / 10.0f;
         doc["t1"]  = pkt.ticks1;
         doc["t2"]  = pkt.ticks2;
         doc["tg"]  = pkt.ticksAlvo;
         doc["w1"]  = pkt.pwm1;
         doc["w2"]  = pkt.pwm2;
-        doc["rt"]  = serialized(String(pkt.rpmAlvo, 1));
+        doc["rt"]  = roundf(pkt.rpmAlvo * 10.0f) / 10.0f;
 
         String json;
         serializeJson(doc, json);

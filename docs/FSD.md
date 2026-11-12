@@ -106,7 +106,7 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | Parâmetro | Macro no Código | Valor Homologado | Efeito Funcional |
 | :--- | :--- | :---: | :--- |
 | **Resolução Efetiva** | `PPR_EFETIVO` | `4320.0f` | pulsos por volta completa da roda |
-| **Velocidade de Cruzeiro** | `VELOCIDADE_CRUZEIRO_RPM` | `80.0f` | $\approx 293\text{ mm/s}$ (~1,88 s por lado de 500 mm) |
+| **Velocidade de Cruzeiro** | `VELOCIDADE_CRUZEIRO_RPM` | `80.0f` | $\approx 293\text{ mm/s}$ (~2,50 s por lado de 500 mm) |
 | **Velocidade Mínima de Rampa** | `VELOCIDADE_MIN_RPM` | `20.0f` | Garante torque inicial sem estolar o motor |
 | **Velocidade de Curva** | `VELOCIDADE_GIRO_RPM` | `50.0f` | $\approx 0,52\text{ s}$ por giro de 90° |
 | **Rampa de Aceleração** | `RAMPA_ACEL_DIST_MM` | `50.0f` | Aceleração ágil ($\approx 600\text{ mm/s}^2$) sem patinar |

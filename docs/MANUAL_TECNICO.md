@@ -96,7 +96,7 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 
 ### 4.2 Dinâmica do Perfil Trapezoidal
 * **Reta (500 mm):**
-  * Acelera de 20 RPM até **80 RPM** nos primeiros **50 mm** ($\approx 600\text{ mm/s}^2$).
+  * Acelera de 20 RPM até **55 RPM** nos primeiros **50 mm** ($\approx 600\text{ mm/s}^2$).
   * Mantém velocidade de cruzeiro estável por **390 mm** (78% da reta).
   * Desacelera nos últimos **60 mm** para parada cravada na marca de 500 mm.
   * Tempo total por reta: **$\approx 1,88\text{ s}$**.
@@ -106,13 +106,21 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 
 ---
 
-## 5. Guia de Operação e Comandos
+## 5. Guia Rápido de Operação e Comandos (Versão 4)
 
+### 5.1 Operação Sem Fio pelo Navegador (Recomendado)
+1. Ligue a alimentação dos motores e do ESP32 na bateria.
+2. O robô se conectará automaticamente à rede Wi-Fi configurada (`secrets.h`).
+3. No PC ou celular na mesma rede, abra:
+   * **`http://robo.local/`** (ou o IP atribuído, ex: `http://192.168.1.102/`).
+4. O painel exibirá os gráficos de RPM, Yaw e PWM em tempo real.
+5. Posicione o robô no solo e clique no botão verde **START** para iniciar a trajetória quadrada.
+6. A qualquer momento, envie comando de parada remota pelo painel para interromper o movimento.
+7. Ao término, clique em **DOWNLOAD CSV** no dashboard para salvar o registro completo dos dados da corrida.
+
+### 5.2 Operação Local via Cabo Serial (Fallback de Bancada)
 1. Conecte o robô via USB (`COM9`) e abra o monitor serial em **115200 baud**.
-2. Ligue a alimentação geral dos motores na bateria.
-3. O robô valida os periféricos, arma o ESC por 3 segundos em neutro ($1500\,\mu\text{s}$) e ativa o Watchdog Timer de 5 segundos.
-4. Envie o caractere **`s`** ou **`g`** pela serial (ou aguarde 5 segundos para partida automática).
-5. O robô percorre os 4 lados de 500 mm com 4 giros de 90° e para com segurança.
+2. O robô aceita o envio de **`s`** ou **`g`** pela serial para início manual (ou aguarda 5s para timeout).
 
 ---
 

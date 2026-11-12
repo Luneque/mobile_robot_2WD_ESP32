@@ -176,8 +176,8 @@ void processarControleMovimento(uint32_t now) {
     } else {
         // Na curva pivô, se a IMU estiver ativa, ela é a autoridade máxima do ângulo de 90°
         if (imu.isInitialized()) {
-            // IMU é a autoridade de ângulo; ticks são fallback de segurança (+15%)
-            atingiuMeta = (yawAbs >= (g_anguloTotalGraus - 2.0f)) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f));
+            // IMU é a autoridade de ângulo; tolerância de 1.0 deg compensada com a inércia de frenagem (para exato em 90.0 deg)
+            atingiuMeta = (yawAbs >= (g_anguloTotalGraus - 1.0f)) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f));
         } else {
             atingiuMeta = (avgTicks >= g_targetTicks);
         }
@@ -499,6 +499,19 @@ void loop() {
             break;
 
         case ESTADO_EXECUTANDO_TRAJETORIA:
+            // Interrupção remota via WebSocket (comando "stop" ou "pause")
+            if (g_wifiOk && wirelessTelem.hasNewCommand()) {
+                char cmd = wirelessTelem.getLastCommand();
+                if (cmd == 'x' || cmd == 'p') {
+                    motors.stopAll();
+                    g_lastPwm1 = ESC_NEUTRO_US;
+                    g_lastPwm2 = ESC_NEUTRO_US;
+                    estadoAtual = ESTADO_CONCLUIDO;
+                    Serial.println("\n[PARADA REMOTA] Trajetoria interrompida via WebSocket!");
+                    break;
+                }
+            }
+
             if (subEstado == SUB_INICIAR_SEGMENTO) {
                 if (g_emLinhaReta) {
                     iniciarMovimentoReta(LADO_QUADRADO_MM);
