@@ -87,7 +87,7 @@ $$\text{PPR}_{\text{efetivo}} = 12 \text{ PPR} \times 90 \text{ (Redução)} \ti
 A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/):
 
 ### 4.1 Módulos do Sistema
-* **[`config.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/config.h):** Centraliza pinos, limites de pulso do ESC ($11110\,\mu\text{s}$ a $18110\,\mu\text{s}$), parâmetros cinemáticos, distâncias de rampa, parâmetros do WDT e ganhos de fusão com a IMU (`IMU_KP_YAW_RETA`).
+* **[`config.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/config.h):** Centraliza pinos, limites de pulso do ESC ($1150\,\mu\text{s}$ a $1850\,\mu\text{s}$), parâmetros cinemáticos, distâncias de rampa, parâmetros do WDT e ganhos de fusão com a IMU (`IMU_KP_YAW_RETA`).
 * **[`imu_bmi160.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/imu_bmi160.h):** Driver nativo I2C (400 kHz) para a IMU Bosch BMI160. Fornece calibração estática de *bias* do giroscópio, inversão de polaridade (giro horário = Yaw positivo) e integração de ângulo de guinada (*Yaw*). O firmware usa `yawError = yawAtual` (erro relativo ao início de cada segmento, pois `resetYaw()` zera o ângulo) para correção de rumo em retas (`IMU_KP_YAW_RETA = 1.2`). No pivô, a IMU atua pelo critério de parada (`|yawError| ≥ (ânguloAlvo − 2°)`) e pelo mapeamento do perfil trapezoidal; o sincronismo cruzado é feito apenas pelos encoders. O acelerômetro é inicializado pelo driver (ODR 100 Hz, ±2 g), mas não é lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura.
 * **[`motor_control_mcpwm.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/motor_control_mcpwm.h):** Gerador determinístico de PWM a 50 Hz com resolução de $1\,\mu\text{s}$ via timer de 1 MHz.
 * **[`encoder_reader_pcnt.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/encoder_reader_pcnt.h):** Decodificador de pulsos com filtro anti-glitch de 1000 ns e filtro exponencial de velocidade (EMA).
@@ -110,7 +110,7 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 
 1. Conecte o robô via USB (`COM9`) e abra o monitor serial em **115200 baud**.
 2. Ligue a alimentação geral dos motores na bateria.
-3. O robô valida os periféricos, arma o ESC por 3 segundos em neutro ($1500\,\mu\text{s}$) e ativa o Watchdog Timer de 3 segundos.
+3. O robô valida os periféricos, arma o ESC por 3 segundos em neutro ($1500\,\mu\text{s}$) e ativa o Watchdog Timer de 5 segundos.
 4. Envie o caractere **`s`** ou **`g`** pela serial (ou aguarde 5 segundos para partida automática).
 5. O robô percorre os 4 lados de 500 mm com 4 giros de 90° e para com segurança.
 

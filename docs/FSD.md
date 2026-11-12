@@ -108,9 +108,11 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | **Ganho Proporcional** | `PID_KP_M1`, `PID_KP_M2` | `1.8f` | Resposta rápida sem sobre-oscilação |
 | **Ganho Integral** | `PID_KI_M1`, `PID_KI_M2` | `0.6f` | Zera erro em regime permanente |
 | **Ganho Derivativo** | `PID_KD_M1`, `PID_KD_M2` | `0.02f` | Amortecimento de transientes |
-| **Ganho de Sincronismo** | `K_SYNC` | `0.05f` | Trava o avanço relativo entre rodas |
-| **Timeout do Watchdog** | `WDT_TIMEOUT_SECONDS` | `3` | Reinício automático em caso de travamento |
+| **Ganho de Sincronismo** | `K_SYNC` | `0.08f` | Trava o avanço relativo entre rodas |
+| **Timeout do Watchdog** | `WDT_TIMEOUT_SECONDS` | `5` | Reinício automático em caso de travamento (ajustado para Wi-Fi) |
 | **Pausa de Estabilização** | `PAUSA_ENTRE_MOVIMENTOS_MS` | `800` | Dissipação de inércia residual |
+| **Zona Morta ESC** | `ESC_DEADBAND_US` | `110.0f` | Feedforward para romper atrito estático em t=0 |
+| **Ganho de Yaw em Reta** | `IMU_KP_YAW_RETA` | `1.2f` | Correção proporcional ativa de rumo via giroscópio |
 
 ---
 
