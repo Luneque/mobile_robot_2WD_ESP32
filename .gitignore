@@ -12,3 +12,10 @@ Desktop.ini
 # Backups e rascunhos
 *.tmp
 *.bak
+
+
+# Credenciais Wi-Fi (nunca commitar!)
+**/secrets.h
+
+# Logs de telemetria
+robo_monitor/logs/*.csv

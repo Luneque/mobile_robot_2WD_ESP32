@@ -1,0 +1,5 @@
+# Dependências do robo_ws_logger.py
+# Instale com: pip install -r requirements.txt
+
+websockets>=12.0
+rich>=13.0
