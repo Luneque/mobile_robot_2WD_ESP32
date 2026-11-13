@@ -156,6 +156,7 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 * **`diag_pcnt/`:** Utilitário oficial de diagnóstico e validação dos encoders em hardware.
 * **`diag_i2c_bmi160/`:** Utilitário de diagnóstico I2C da IMU Bosch BMI160.
 * **`calib_imu_polaridade/`:** Ferramenta de validação da polaridade do eixo Z da IMU.
+* **`diag_motor_curve/`:** Utilitário de bancada que levanta a curva PWM × RPM dos motores, usado para decidir entre ajuste de PID e recalibração de ESC.
 
 ## 📄 Atualizações Recentes (13/11/2026)
 

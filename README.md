@@ -58,6 +58,7 @@ Teste_car_0/
 ├── diag_pcnt/                 # Utilitário de diagnóstico e calibração de encoders em hardware
 ├── diag_i2c_bmi160/           # Utilitário de diagnóstico I2C e leitura da IMU BMI160
 ├── calib_imu_polaridade/      # Ferramenta de validação da polaridade do eixo Z da IMU
+├── diag_motor_curve/          # Utilitário de bancada: curva PWM x RPM dos motores
 ├── diag_encoders/             # [LEGADO V1] Utilitário de teste de encoders (pinout GPIO 23/22)
 └── docs/                      # Documentação técnica e de engenharia
     ├── FSD.md                 # Especificação Funcional Definitiva (v4.0.0 em PT-BR)
