@@ -176,8 +176,13 @@ void processarControleMovimento(uint32_t now) {
     } else {
         // Na curva pivô, se a IMU estiver ativa, ela é a autoridade máxima do ângulo de 90°
         if (imu.isInitialized()) {
-            // IMU é a autoridade de ângulo; tolerância de 1.0 deg compensada com a inércia de frenagem (para exato em 90.0 deg)
-            atingiuMeta = (yawAbs >= (g_anguloTotalGraus - 1.0f)) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f));
+            // Guarda mínimo de ticks reais de encoder antes de aceitar o yaw da IMU como critério.
+            // Isso evita disparo imediato caso o yaw tenha resíduo do segmento anterior (> 89°
+            // logo após resetYaw por latência do giroscópio) sem nenhum movimento real registrado.
+            const int32_t MIN_TICKS_PIVO = 200; // ~9.6mm de arco = confirmação de movimento real
+            bool movimentoConfirmado = (avgTicks >= MIN_TICKS_PIVO);
+            atingiuMeta = movimentoConfirmado &&
+                          ((yawAbs >= (g_anguloTotalGraus - 1.0f)) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f)));
         } else {
             atingiuMeta = (avgTicks >= g_targetTicks);
         }

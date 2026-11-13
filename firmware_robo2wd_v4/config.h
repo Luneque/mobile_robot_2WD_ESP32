@@ -64,7 +64,7 @@
 #define PID_KD_M2          0.02f
 
 // Ganho de sincronismo cruzado entre rodas (Cross-Coupling Synchronization)
-#define K_SYNC             0.08f
+#define K_SYNC             0.12f   // Aumentado de 0.08 para corrigir drift sistemático M2>M1 (~100 ticks por reta)
 
 // ==========================================
 // 4.1 FUSÃO SENSORIAL E CONTROLE ANGULAR COM IMU (BMI160)
