@@ -63,6 +63,7 @@ int32_t g_targetTicks = 0;
 float g_distanciaTotalMm = 0.0f;
 float g_anguloTotalGraus = 0.0f;
 int g_sentidoGiro = 1; // +1 = Direita (Horário)
+float g_yawStartSeg = 0.0f; // Ângulo de yaw exato no instante em que o movimento inicia
 
 // =========================================================================
 // PERFIL TRAPEZOIDAL DE VELOCIDADE
@@ -126,6 +127,7 @@ void iniciarMovimentoReta(float distanciaMm) {
     pid1.reset();
     pid2.reset();
     imu.resetYaw(); // Zera a orientação de referência para a reta
+    g_yawStartSeg = 0.0f;
     g_desbalStartTime = 0;
     subEstado = SUB_EM_MOVIMENTO;
     Serial.printf("\n[V4-RETA] Lado %d de %d | Dist: %.1f mm | Alvo: %d ticks\n",
@@ -141,7 +143,8 @@ void iniciarMovimentoCurva(float anguloGraus, int sentido) {
     encoders.reset();
     pid1.reset();
     pid2.reset();
-    imu.resetYaw(); // Zera o ângulo para medir os 90° exatos via giroscópio
+    imu.resetYaw(); // Zera o acumulador de yaw
+    g_yawStartSeg = imu.getYawAngleDeg(); // Captura o valor exato no instante zero
     g_desbalStartTime = 0;
     subEstado = SUB_EM_MOVIMENTO;
     Serial.printf("\n[V4-PIVO] Curva %d de %d | Angulo: %.1f deg (%s) | Alvo: %d ticks/roda\n",
@@ -165,8 +168,9 @@ void processarControleMovimento(uint32_t now) {
     int32_t avgTicks = (t1 + t2) / 2;
 
     float yawAtual = imu.getYawAngleDeg();         // valor bruto com sinal
-    float yawError = yawAtual;                     // erro relativo ao início do segmento (resetYaw zera o ângulo)
-    float yawAbs   = fabsf(yawError);              // magnitude para critério de parada de curva
+    float deltaYaw = yawAtual - g_yawStartSeg;      // ângulo EFETIVAMENTE girado desde o início deste segmento
+    float yawError = deltaYaw;                      // erro relativo ao início do segmento
+    float yawAbs   = fabsf(deltaYaw);               // magnitude real da rotação executada
 
     // 1. Critério de Parada
     bool atingiuMeta = false;
@@ -176,13 +180,12 @@ void processarControleMovimento(uint32_t now) {
     } else {
         // Na curva pivô, se a IMU estiver ativa, ela é a autoridade máxima do ângulo de 90°
         if (imu.isInitialized()) {
-            // Guarda mínimo de ticks reais de encoder antes de aceitar o yaw da IMU como critério.
-            // Isso evita disparo imediato caso o yaw tenha resíduo do segmento anterior (> 89°
-            // logo após resetYaw por latência do giroscópio) sem nenhum movimento real registrado.
+            // Guarda mínimo de ticks reais de encoder antes de aceitar o delta de yaw da IMU.
             const int32_t MIN_TICKS_PIVO = 200; // ~9.6mm de arco = confirmação de movimento real
             bool movimentoConfirmado = (avgTicks >= MIN_TICKS_PIVO);
+            // Parada antecipada em 89.5 deg para acomodar a inércia de frenagem a 35 RPM
             atingiuMeta = movimentoConfirmado &&
-                          ((yawAbs >= (g_anguloTotalGraus - 1.0f)) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f)));
+                          ((yawAbs >= (g_anguloTotalGraus - 0.5f)) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f)));
         } else {
             atingiuMeta = (avgTicks >= g_targetTicks);
         }

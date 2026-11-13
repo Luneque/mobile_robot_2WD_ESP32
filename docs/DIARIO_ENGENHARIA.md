@@ -135,7 +135,17 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 11. Resumo da Estrutura Atual do Repositório
+### 11. Etapa 11: Correção de Rotação por Delta Real ($\Delta\text{yaw}$) e Odometria Cumulativa (13/11/2026)
+* **Diagnóstico de Desvio Cumulativo:**
+  * O robô acumulava desvio que se agravava a cada volta porque o critério de corte de pivô avaliava o valor absoluto do yaw em vez do delta de rotação efetivo ($\Delta\text{yaw} = \text{yawAtual} - \text{yawStartSeg}$). Qualquer resíduo de yaw (+1° ou +2°) antecipava o corte da curva, fazendo o robô girar apenas ~86° a 88° reais por canto.
+  * No painel web, o mapa de trajetória forçava os ângulos nominais de 90° em cada lado (`baseDeg`), mascarando o erro real e desenhando um quadrado ilusório na tela.
+* **Correções Aplicadas:**
+  1. **Controle por $\Delta\text{yaw}$ no Firmware (`firmware_robo2wd_v4.ino`):** Captura `g_yawStartSeg` no início exato de cada pivô e avalia `fabsf(yawAtual - g_yawStartSeg) >= 89.5°`, garantindo o giro completo e exato de 90° físicos em todas as curvas.
+  2. **Odometria Realista e Cumulativa no Dashboard (`wifi_telemetry.h`):** O rastro do mapa agora utiliza orientação global cumulativa contínua, sem forçar múltiplos fixos de 90°. Se houver qualquer imperfeição na pista, o mapa refletirá com exatidão a inclinação e a trajetória real do robô.
+
+---
+
+### 12. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.
