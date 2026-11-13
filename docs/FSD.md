@@ -158,3 +158,15 @@ stateDiagram-v2
 * **v2.0.0 (Legado - `legacy/firmware_robo2wd_v2/`):** Migrou para MCPWM e PCNT em hardware, comprovando a redução real de 1:90 ($4.320\text{ pulsos/volta}$) e introduzindo o sincronismo cruzado. Execução em loops bloqueantes dentro do `setup()`.
 * **v3.0.0 (Legado - `legacy/firmware_robo2wd_v3/`):** Arquitetura não-bloqueante no `loop()`, perfil trapezoidal e integração inicial da IMU BMI160 com telemetria por cabo serial.
 * **v4.0.0 (OFICIAL - `firmware_robo2wd_v4/`):** Telemetria sem fio contínua via Wi-Fi/WebSocket (5 Hz), Dashboard Web embarcado em PROGMEM, comandos START/STOP remotos, feedforward de zona morta calibrado em 110 µs, cruzeiro homologado em 40 RPM e giro pivô com corte em 89,0° (parada exata a 90,0°).
+
+## 📄 Atualizações Recentes (13/11/2026)
+
+- **Firmware:** origem da odometria fixa em (500 mm, 0); cálculo de `baseDeg` por lado; seta de direção corrigida (`curHeadingDeg = baseDeg - d.yaw`); ganhos reforçados `K_SYNC = 0.12` e `IMU_KP_YAW_RETA = 2.0`; limite de PWM ampliado para ±50 µs.
+- **Dashboard Web:** desenho do quadrado ideal usando coordenadas reais (500 mm × 500 mm) na sequência **Início → L1 → L2 → L3 → Início**; rastro real em verde com odometria cumulativa; indicador de pose (X, Y, θ) numérico; seta de direção agora correta durante pivôs.
+- **Documentação:** README e Diário de Engenharia já atualizados com as mudanças acima.
+
+## 📄 Atualizações Recentes (13/11/2026)
+
+- **Firmware:** origem da odometria fixa em (500 mm, 0); cálculo de `baseDeg` por lado; seta de direção corrigida (`curHeadingDeg = baseDeg - d.yaw`); ganhos reforçados `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0`; limite de PWM ampliado para ±50 µs.
+- **Dashboard Web:** desenho do quadrado ideal usando coordenadas reais (500 mm × 500 mm) na sequência **Início → L1 → L2 → L3 → Início**; rastro real em verde com odometria cumulativa; indicador de pose (X, Y, θ) numérico; seta de direção agora correta durante pivôs.
+- **Documentação:** README, Diário de Engenharia, FSD e Manual Técnico atualizados com as mudanças acima.

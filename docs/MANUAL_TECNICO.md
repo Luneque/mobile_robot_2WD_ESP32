@@ -138,3 +138,9 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 ```powershell
 & "C:\Users\luneque.junior\AppData\Local\Arduino15\packages\esp32\tools\esptool_py\5.3.1\esptool.exe" --chip esp32 --port COM9 --baud 921600 --before default-reset --after hard-reset write_flash -z --flash-mode dio --flash-freq 80m --flash-size 4MB 0x1000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.bootloader.bin" 0x8000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.partitions.bin" 0xe000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\boot_app0.bin" 0x10000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.bin"
 ```
+
+## 📄 Atualizações Recentes (13/11/2026)
+
+- **Firmware:** origem da odometria fixa em (500 mm, 0); cálculo de `baseDeg` por lado; seta de direção corrigida (`curHeadingDeg = baseDeg - d.yaw`); ganhos reforçados `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0`; limite de PWM ampliado para ±50 µs.
+- **Dashboard Web:** quadrado ideal usando coordenadas reais (500 mm × 500 mm) em ordem **Início → L1 → L2 → L3 → Início**; rastro real em verde com odometria cumulativa; indicador de pose (X, Y, θ) numérico; seta de direção correta nos pivôs.
+- **Documentação:** README, Diário de Engenharia, FSD e este Manual agora contém o resumo das mudanças.
