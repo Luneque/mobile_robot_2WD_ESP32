@@ -159,15 +159,15 @@ const WIN = 75;
 
 // ---- Odometria / Mapa 2D ----
 const MM_PER_TICK = 0.04799656; // 66mm diametro / 4320 ticks
-let posX = 0, posY = 0; // Posição estimada em mm
+let posX = 500, posY = 0; // Ponto de partida real: Início (500, 0)
 let prevTicks = 0, prevSegSide = -1, prevSegState = '';
-let trajectory = [{x: 0, y: 0}];
+let trajectory = [{x: 500, y: 0}];
 let curHeadingDeg = 0;
 
 function resetMap() {
-  posX = 0; posY = 0; curHeadingDeg = 0;
+  posX = 500; posY = 0; curHeadingDeg = 0;
   prevTicks = 0; prevSegSide = -1; prevSegState = '';
-  trajectory = [{x: 0, y: 0}];
+  trajectory = [{x: 500, y: 0}];
   drawMap();
 }
 
@@ -180,17 +180,28 @@ function updateOdometry(d) {
     prevSegSide = d.sd;
     prevSegState = d.st;
     
-    // Se completou várias voltas e reiniciou no L1, reinicia o rastro
+    // Se completou várias voltas e reiniciou no L1, reinicia o rastro no Início
     if (d.st === 'RETA' && d.sd === 1 && trajectory.length > 500) {
-      posX = 0; posY = 0;
-      trajectory = [{x: 0, y: 0}];
+      posX = 500; posY = 0;
+      trajectory = [{x: 500, y: 0}];
     }
   }
 
   const deltaTicks = curAvgTicks - prevTicks;
-  // Ângulo base nominal por lado: L1: 0° (+Y), L2: 90° (+X), L3: 180° (-Y), L4: 270° (-X)
-  const baseDeg = ((d.sd - 1) % 4) * 90.0;
-  curHeadingDeg = baseDeg + d.yaw;
+  
+  // Geometria real homologada:
+  // Início (500, 0) -> L1 (500, 500) -> L2 (0, 500) -> L3 (0, 0) -> Início (500, 0)
+  // L1: sobe (+Y)            -> 0°
+  // L2: vai para esquerda (-X) -> 270°
+  // L3: desce (-Y)           -> 180°
+  // L4: vai para direita (+X)  -> 90°
+  let baseDeg = 0;
+  if (d.sd === 1) baseDeg = 0;
+  else if (d.sd === 2) baseDeg = 270;
+  else if (d.sd === 3) baseDeg = 180;
+  else if (d.sd === 4) baseDeg = 90;
+
+  curHeadingDeg = (baseDeg + d.yaw);
 
   if (d.st === 'RETA') {
     if (deltaTicks > 0) {
@@ -244,23 +255,21 @@ function drawMap() {
   }
   
   // 1. Quadrado Ideal (500x500 mm) em Azul tracejado
-  // L1: (0,0) -> (0,500)
-  // L2: (0,500) -> (500,500)
-  // L3: (500,500) -> (500,0)
-  // L4: (500,0) -> (0,0)
-  const p0 = toScreen(0, 0);
-  const pTopLeft = toScreen(0, 500);
-  const pTopRight = toScreen(500, 500);
-  const pBottomRight = toScreen(500, 0);
+  // Percurso Real do Robô:
+  // Início (500,0) -> L1 (500,500) -> L2 (0,500) -> L3 (0,0) -> Início (500,0)
+  const pInicio = toScreen(500, 0);
+  const pL1     = toScreen(500, 500);
+  const pL2     = toScreen(0, 500);
+  const pL3     = toScreen(0, 0);
   
   ctx.strokeStyle = '#388bfd';
   ctx.lineWidth = 2;
   ctx.setLineDash([6, 4]);
   ctx.beginPath();
-  ctx.moveTo(p0.x, p0.y);
-  ctx.lineTo(pTopLeft.x, pTopLeft.y);
-  ctx.lineTo(pTopRight.x, pTopRight.y);
-  ctx.lineTo(pBottomRight.x, pBottomRight.y);
+  ctx.moveTo(pInicio.x, pInicio.y);
+  ctx.lineTo(pL1.x, pL1.y);
+  ctx.lineTo(pL2.x, pL2.y);
+  ctx.lineTo(pL3.x, pL3.y);
   ctx.closePath();
   ctx.stroke();
   ctx.setLineDash([]);
@@ -268,10 +277,10 @@ function drawMap() {
   // Rótulo dos Vértices ideais
   ctx.fillStyle = '#58a6ff';
   ctx.font = '10px "Segoe UI", sans-serif';
-  ctx.fillText('Início (0,0)', p0.x - 20, p0.y + 15);
-  ctx.fillText('L1 (500mm)', pTopLeft.x - 20, pTopLeft.y - 8);
-  ctx.fillText('L2 (500mm)', pTopRight.x - 10, pTopRight.y - 8);
-  ctx.fillText('L3 (500mm)', pBottomRight.x - 10, pBottomRight.y + 15);
+  ctx.fillText('Início (500,0)', pInicio.x - 30, pInicio.y + 16);
+  ctx.fillText('L1 (500,500)', pL1.x - 15, pL1.y - 8);
+  ctx.fillText('L2 (0,500)', pL2.x - 20, pL2.y - 8);
+  ctx.fillText('L3 (0,0)', pL3.x - 20, pL3.y + 16);
   
   // 2. Trajetória Real Percorrida (Rastro Verde)
   if (trajectory.length > 1) {
