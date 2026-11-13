@@ -156,3 +156,9 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 * **`diag_pcnt/`:** Utilitário oficial de diagnóstico e validação dos encoders em hardware.
 * **`diag_i2c_bmi160/`:** Utilitário de diagnóstico I2C da IMU Bosch BMI160.
 * **`calib_imu_polaridade/`:** Ferramenta de validação da polaridade do eixo Z da IMU.
+
+## 📄 Atualizações Recentes (13/11/2026)
+
+- **Firmware:** origem da odometria fixa em (500 mm, 0); baseDeg por lado; correção de seta (`curHeadingDeg = baseDeg - d.yaw`); K_SYNC=0.15, IMU_KP_YAW_RETA=2.0; PWM clamp ±50 µs.
+- **Dashboard:** quadrado ideal usando coordenadas reais (500 mm); rastro real em verde com odometria cumulativa; indicador de pose (X, Y, θ) numérico; seta de direção corrigida.
+- **Documentação:** README atualizado com resumo das mudanças.

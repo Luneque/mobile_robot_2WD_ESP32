@@ -88,3 +88,20 @@ Teste_car_0/
 * 📄 **[Manual Técnico e de Operação](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/MANUAL_TECNICO.md)**
 * 📄 **[Especificação Funcional (FSD v4.0)](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/FSD.md)**
 * 📄 **[Diário de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/DIARIO_ENGENHARIA.md)**
+
+## 📄 Atualizações Recentes (13/11/2026)
+
+### Firmware
+- **Origem da odometria:** ponto inicial fixado em **(500 mm, 0)**.
+- **Ângulos de base específicos por lado:** cálculo de `baseDeg` agora depende do lado da roda, corrigindo a direção esperada.
+- **Correção de sinal da seta de orientação:** durante pivôs, a seta agora usa `curHeadingDeg = baseDeg - d.yaw` (antes `+`).
+- **Ganho de controle reforçado:** `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0` para reduzir desvio em retas.
+- **Clamping de PWM ampliado:** now ±50 µs (antes ±30 µs).
+
+### Dashboard Web
+- **Desenho do quadrado ideal:** agora utiliza as coordenadas reais (500 mm × 500 mm) e segue a sequência **Início → L1 → L2 → L3 → Início**.
+- **Rastro de trajetória real:** renderizado em linha verde usando odometria cumulativa, refletindo desvios reais.
+- **Indicador de pose:** ponto + vetor direcional com valores de **X, Y (mm)** e **θ (°)** exibidos numericamente.
+- **Seta de direção:** orientada corretamente durante pivôs, correspondendo ao movimento real.
+
+Para mais detalhes, veja o [Diário de Engenharia](docs/DIARIO_ENGENHARIA.md).
