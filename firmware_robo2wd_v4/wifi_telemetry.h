@@ -159,16 +159,13 @@ const WIN = 75;
 
 // ---- Odometria / Mapa 2D ----
 const MM_PER_TICK = 0.04799656; // 66mm diametro / 4320 ticks
-let posX = 0, posY = 0; // mm no plano 2D
+let posX = 0, posY = 0; // Posição estimada em mm
 let prevTicks = 0, prevSegSide = -1, prevSegState = '';
 let trajectory = [{x: 0, y: 0}];
-let globalHeadingDeg = 0; // Orientação cumulativa real no espaço (0° = +Y / frente)
-let segStartHeadingDeg = 0; // Orientação gravada na entrada do segmento
-let prevYawInSeg = 0;
+let curHeadingDeg = 0;
 
 function resetMap() {
-  posX = 0; posY = 0;
-  globalHeadingDeg = 0; segStartHeadingDeg = 0; prevYawInSeg = 0;
+  posX = 0; posY = 0; curHeadingDeg = 0;
   prevTicks = 0; prevSegSide = -1; prevSegState = '';
   trajectory = [{x: 0, y: 0}];
   drawMap();
@@ -177,44 +174,35 @@ function resetMap() {
 function updateOdometry(d) {
   const curAvgTicks = (d.t1 + d.t2) / 2;
   
-  // Detecta transição de segmento
+  // Transição de estado/lado
   if (d.sd !== prevSegSide || d.st !== prevSegState) {
-    // Ao encerrar um pivô, consolida o giro angular real ocorrido
-    if (prevSegState === 'PIVO') {
-      globalHeadingDeg = (globalHeadingDeg + Math.abs(prevYawInSeg)) % 360.0;
-    }
     prevTicks = curAvgTicks;
     prevSegSide = d.sd;
     prevSegState = d.st;
-    segStartHeadingDeg = globalHeadingDeg;
-    prevYawInSeg = d.yaw;
-
-    // Se reiniciou no Lado 1 após conclusão, limpa histórico extenso
-    if (d.st === 'RETA' && d.sd === 1 && trajectory.length > 200) {
-      posX = 0; posY = 0; globalHeadingDeg = 0; segStartHeadingDeg = 0;
+    
+    // Se completou várias voltas e reiniciou no L1, reinicia o rastro
+    if (d.st === 'RETA' && d.sd === 1 && trajectory.length > 500) {
+      posX = 0; posY = 0;
       trajectory = [{x: 0, y: 0}];
     }
   }
 
-  prevYawInSeg = d.yaw;
   const deltaTicks = curAvgTicks - prevTicks;
+  // Ângulo base nominal por lado: L1: 0° (+Y), L2: 90° (+X), L3: 180° (-Y), L4: 270° (-X)
+  const baseDeg = ((d.sd - 1) % 4) * 90.0;
+  curHeadingDeg = baseDeg + d.yaw;
 
-  if (d.st === 'PIVO') {
-    // No pivô, atualiza a orientação instantânea para o indicador
-    globalHeadingDeg = segStartHeadingDeg + Math.abs(d.yaw);
-    prevTicks = curAvgTicks;
-  } else if (d.st === 'RETA') {
-    // Na reta, desloca considerando a orientação global real + desvio instantâneo medido
-    const curHeading = segStartHeadingDeg + d.yaw;
-    globalHeadingDeg = curHeading;
+  if (d.st === 'RETA') {
     if (deltaTicks > 0) {
       const deltaDist = deltaTicks * MM_PER_TICK;
-      const rad = (curHeading * Math.PI) / 180.0;
+      const rad = (curHeadingDeg * Math.PI) / 180.0;
       posX += deltaDist * Math.sin(rad);
       posY += deltaDist * Math.cos(rad);
       trajectory.push({x: posX, y: posY});
       prevTicks = curAvgTicks;
     }
+  } else if (d.st === 'PIVO') {
+    prevTicks = curAvgTicks;
   }
 }
 
@@ -309,7 +297,7 @@ function drawMap() {
   ctx.fill();
   
   // Vetor de direção (orientação do robô)
-  const headingRad = (globalHeadingDeg * Math.PI) / 180.0;
+  const headingRad = (curHeadingDeg * Math.PI) / 180.0;
   const arrowLen = 18;
   const arrowX = curPos.x + arrowLen * Math.sin(headingRad);
   const arrowY = curPos.y - arrowLen * Math.cos(headingRad);
@@ -324,7 +312,7 @@ function drawMap() {
   ctx.fillStyle = '#c9d1d9';
   ctx.font = '11px "Segoe UI", monospace';
   ctx.fillText(`X: ${posX.toFixed(0)} mm | Y: ${posY.toFixed(0)} mm`, 10, 20);
-  ctx.fillText(`θ: ${(globalHeadingDeg % 360.0).toFixed(1)}°`, 10, 36);
+  ctx.fillText(`θ: ${(curHeadingDeg % 360.0).toFixed(1)}°`, 10, 36);
   
   ctx.restore();
 }
