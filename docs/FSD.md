@@ -24,7 +24,7 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 1. **Periférico PCNT (Pulse Counter):** Decodifica por hardware a quadratura 4x dos encoders com filtros digitais anti-ruído (*glitch filters* de 1000 ns), eliminando qualquer sobrecarga de CPU.
 2. **Periférico MCPWM (Motor Control PWM):** Gera pulsos de controle para o ESC a 50 Hz com resolução de $1\,\mu\text{s}$ via timer dedicado de 1 MHz.
 3. **Máquina de Estados Não-Bloqueante (FSM):** Toda a lógica opera orientada a tempo no `loop()`, permitindo integração com sensores futuros e comunicação sem loops de espera com `delay()`.
-4. **Perfil de Velocidade Trapezoidal:** Rampas progressivas de aceleração (50 mm) e desaceleração (60 mm), eliminando derrapagens (*wheel slip*) e permitindo velocidade de cruzeiro de **80 RPM** ($\approx 293\text{ mm/s}$).
+4. **Perfil de Velocidade Trapezoidal:** Rampas progressivas de aceleração (50 mm) e desaceleração (60 mm), eliminando derrapagens (*wheel slip*) e permitindo velocidade de cruzeiro alvo de **55 RPM** ($\approx 190\text{ mm/s}$ nominal; ~40 RPM real em solo).
 5. **Segurança Ativa e Hardware Watchdog:**
    * Detecção de desbalanceamento e stall em retas e curvas pivô.
    * Task Watchdog Timer do ESP32 (`esp_task_wdt`) ativo e reconfigurado para 5 segundos.
@@ -95,9 +95,9 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 - **GPIO 21 (SDA)** e **GPIO 22 (SCL)** conectados ao sensor IMU BMI160 (giroscópio + acelerômetro).
 - **GPIO 23** pode ser usado como sinal de interrupção **INT** da IMU (opcional).
 - O driver `imu_bmi160.h` fornece leitura de ângulo de guinada (yaw) e calibração de polaridade.
-- **Lógica de controle por erro relativo:** A cada início de segmento (reta ou curva), `imu.resetYaw()` zera o ângulo de yaw. O erro de yaw é o próprio ângulo medido (`yawError = yawAtual`), relativo ao início do segmento e com sinal preservado (horário = positivo).
-  - **Retas:** `sync_corr += yawError * IMU_KP_YAW_RETA` — corrige desvio lateral aplicando diferencial de velocidade entre as rodas.
-  - **Curvas (pivô):** a IMU atua pelo critério de parada (`|yawError| ≥ (ânguloAlvo − 1°)`) e pelo mapeamento do perfil trapezoidal; o sincronismo cruzado segue apenas pelos encoders.
+- **Lógica de controle por delta real de yaw:** A cada início de segmento (reta ou curva), o firmware captura `g_yawStartSeg = imu.getYawAngleDeg()` e avalia o delta efetivamente girado (`deltaYaw = yawAtual − g_yawStartSeg`), com sinal preservado (horário = positivo). Isso elimina o disparo prematuro por resíduo de yaw da pausa anterior.
+  - **Retas:** `sync_corr += deltaYaw * IMU_KP_YAW_RETA` — corrige desvio lateral aplicando diferencial de velocidade entre as rodas.
+  - **Curvas (pivô):** a IMU atua pelo critério de parada (`|deltaYaw| ≥ (ânguloAlvo − 0,5°)`, corte em 89,5°) com guarda mínima de 200 ticks (`MIN_TICKS_PIVO`), garantindo a parada exata a 90,0° com a inércia de frenagem; o sincronismo cruzado segue apenas pelos encoders.
 - **Acelerômetro:** Inicializado pelo driver (ODR 100 Hz, faixa ±2 g), mas não lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura. Disponível para fusão sensorial futura (estimativa de inclinação ou detecção de colisão).
 
 ---
@@ -114,14 +114,16 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | **Rampa de Aceleração** | `RAMPA_ACEL_DIST_MM` | `50.0f` | Aceleração ágil ($\approx 600\text{ mm/s}^2$) sem patinar |
 | **Rampa de Desaceleração** | `RAMPA_DESACEL_DIST_MM` | `60.0f` | Frenagem progressiva cravada na marca |
 | **Rampa de Giro (Acel/Desacel)**| `RAMPA_CURVA_ACEL/DESACEL` | `10.0° / 15.0°` | Transição suave no pivô de 90° |
+| **Tolerância de Corte do Pivô** | `g_anguloTotalGraus − 0.5f` | `0,5°` | Corte em 89,5° para parada exata a 90,0° (compensa inércia) |
+| **Guarda Mínima de Giro** | `MIN_TICKS_PIVO` | `200` | Evita corte prematuro por resíduo de yaw da pausa |
 | **Ganho Proporcional** | `PID_KP_M1`, `PID_KP_M2` | `1.8f` | Resposta rápida sem sobre-oscilação |
 | **Ganho Integral** | `PID_KI_M1`, `PID_KI_M2` | `0.6f` | Zera erro em regime permanente |
 | **Ganho Derivativo** | `PID_KD_M1`, `PID_KD_M2` | `0.02f` | Amortecimento de transientes |
-| **Ganho de Sincronismo** | `K_SYNC` | `0.08f` | Trava o avanço relativo entre rodas |
+| **Ganho de Sincronismo** | `K_SYNC` | `0.15f` | Trava o avanço relativo entre rodas |
 | **Timeout do Watchdog** | `WDT_TIMEOUT_SECONDS` | `5` | Reinício automático em caso de travamento (ajustado para Wi-Fi) |
 | **Pausa de Estabilização** | `PAUSA_ENTRE_MOVIMENTOS_MS` | `800` | Dissipação de inércia residual |
 | **Zona Morta ESC** | `ESC_DEADBAND_US` | `110.0f` | Feedforward para romper atrito estático em t=0 |
-| **Ganho de Yaw em Reta** | `IMU_KP_YAW_RETA` | `1.2f` | Correção proporcional ativa de rumo via giroscópio |
+| **Ganho de Yaw em Reta** | `IMU_KP_YAW_RETA` | `2.0f` | Correção proporcional ativa de rumo via giroscópio |
 
 ---
 
@@ -157,16 +159,10 @@ stateDiagram-v2
 * **v1.0.0 (Legado - `legacy/firmware_robo2wd/`):** Utilizava PWM via LEDC e leitura de encoders por interrupções de software (`attachInterrupt`). Apresentava gargalo de CPU e perda de pulsos.
 * **v2.0.0 (Legado - `legacy/firmware_robo2wd_v2/`):** Migrou para MCPWM e PCNT em hardware, comprovando a redução real de 1:90 ($4.320\text{ pulsos/volta}$) e introduzindo o sincronismo cruzado. Execução em loops bloqueantes dentro do `setup()`.
 * **v3.0.0 (Legado - `legacy/firmware_robo2wd_v3/`):** Arquitetura não-bloqueante no `loop()`, perfil trapezoidal e integração inicial da IMU BMI160 com telemetria por cabo serial.
-* **v4.0.0 (OFICIAL - `firmware_robo2wd_v4/`):** Telemetria sem fio contínua via Wi-Fi/WebSocket (5 Hz), Dashboard Web embarcado em PROGMEM, comandos START/STOP remotos, feedforward de zona morta calibrado em 110 µs, cruzeiro homologado em 40 RPM e giro pivô com corte em 89,0° (parada exata a 90,0°).
+* **v4.0.0 (OFICIAL - `firmware_robo2wd_v4/`):** Telemetria sem fio contínua via Wi-Fi/WebSocket (5 Hz), Dashboard Web embarcado em PROGMEM, comandos START/STOP remotos, feedforward de zona morta calibrado em 110 µs, cruzeiro alvo 55 RPM (~40 RPM real em solo) e giro pivô com corte em 89,5° (parada exata a 90,0°).
 
 ## 📄 Atualizações Recentes (13/11/2026)
 
-- **Firmware:** origem da odometria fixa em (500 mm, 0); cálculo de `baseDeg` por lado; seta de direção corrigida (`curHeadingDeg = baseDeg - d.yaw`); ganhos reforçados `K_SYNC = 0.12` e `IMU_KP_YAW_RETA = 2.0`; limite de PWM ampliado para ±50 µs.
-- **Dashboard Web:** desenho do quadrado ideal usando coordenadas reais (500 mm × 500 mm) na sequência **Início → L1 → L2 → L3 → Início**; rastro real em verde com odometria cumulativa; indicador de pose (X, Y, θ) numérico; seta de direção agora correta durante pivôs.
-- **Documentação:** README e Diário de Engenharia já atualizados com as mudanças acima.
-
-## 📄 Atualizações Recentes (13/11/2026)
-
-- **Firmware:** origem da odometria fixa em (500 mm, 0); cálculo de `baseDeg` por lado; seta de direção corrigida (`curHeadingDeg = baseDeg - d.yaw`); ganhos reforçados `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0`; limite de PWM ampliado para ±50 µs.
-- **Dashboard Web:** desenho do quadrado ideal usando coordenadas reais (500 mm × 500 mm) na sequência **Início → L1 → L2 → L3 → Início**; rastro real em verde com odometria cumulativa; indicador de pose (X, Y, θ) numérico; seta de direção agora correta durante pivôs.
-- **Documentação:** README, Diário de Engenharia, FSD e Manual Técnico atualizados com as mudanças acima.
+- **Firmware:** odometria recalibrada para roda de 66 mm (10.417 ticks por reta de 500 mm); corte de pivô por delta real de yaw (`g_yawStartSeg`) com guarda de 200 ticks e tolerância de 0,5° (corte em 89,5°); `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0`; limite de PWM ±50 µs; giro pivô suavizado para 35 RPM.
+- **Dashboard Web:** mapa 2D com quadrado ideal (500 mm), rastro real por odometria cumulativa, pose (X, Y, θ) e seta de direção corrigida.
+- **Documentação:** README, Diário de Engenharia, FSD e Manual Técnico consolidados com os valores vigentes.

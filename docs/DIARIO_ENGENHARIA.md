@@ -124,10 +124,10 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
   * Meta de ticks para reta de 500 mm: $\frac{500}{0,047997} \approx \mathbf{10.417\text{ pulsos}}$ (antes parava em 9.822 pulsos, percorrendo apenas ~471 mm e ficando curto).
   * Meta de ticks de arco por roda no pivô de 90°: $\frac{\pi \times 120 / 4}{0,047997} \approx \mathbf{1.964\text{ pulsos}}$ (antes calculava 1.851 pulsos).
 * **Mitigação do Overshoot e Guarda de Movimento no Pivô:**
-  * Redução da velocidade alvo do pivô de 50 RPM para **35 RPM** (`VELOCIDADE_GIRO_RPM = 35.0f`), diminuindo a energia cinética e a inércia rotacional no corte de potência a 89,0°.
-  * **Guarda Mínima de 200 ticks (`MIN_TICKS_PIVO`):** Elimina condição de corrida na qual o giroscópio ainda carregava yaw residual da pausa anterior e disparava término prematuro a 0° de rotação real. Homologação subsequente registrou **12 pivôs consecutivos sem falhas (média de 89,14°)**.
+  * Redução da velocidade alvo do pivô de 50 RPM para **35 RPM** (`VELOCIDADE_GIRO_RPM = 35.0f`), diminuindo a energia cinética e a inércia rotacional no corte de potência a 89,5°.
+  * **Guarda Mínima de 200 ticks (`MIN_TICKS_PIVO`):** Elimina condição de corrida na qual o giroscópio ainda carregava yaw residual da pausa anterior e disparava término prematuro a 0° de rotação real. Homologação subsequente registrou **12 pivôs consecutivos sem falhas (média de ~89,9°)**.
 * **Compensação de Drift M2 > M1:**
-  * Ajuste de `K_SYNC` de 0.08 para **0.12** (+50%), reduzindo a assimetria sistemática do motor direito de ~102 ticks para 86 ticks e estabilizando o desvio de rumo em retas para **0,59° médio**.
+  * Ajuste de `K_SYNC` de 0.08 para **0.15** (+87%), reduzindo a assimetria sistemática do motor direito de ~102 ticks para 86 ticks e estabilizando o desvio de rumo em retas para **0,59° médio**.
 * **Visualizador 2D de Trajetória no Dashboard (`wifi_telemetry.h`):**
   * Implementação de elemento Canvas HTML5 de alta fidelidade desenhando o percurso ideal do quadrado (500×500 mm) em linha tracejada azul.
   * Reconstrução contínua da trajetória (*dead reckoning*) plotada em linha verde com base no odômetro calibrado e yaw relativo.
@@ -159,6 +159,6 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ## 📄 Atualizações Recentes (13/11/2026)
 
-- **Firmware:** origem da odometria fixa em (500 mm, 0); baseDeg por lado; correção de seta (`curHeadingDeg = baseDeg - d.yaw`); K_SYNC=0.15, IMU_KP_YAW_RETA=2.0; PWM clamp ±50 µs.
+- **Firmware:** odometria recalibrada para roda de 66 mm (10.417 ticks por reta); corte de pivô por delta real de yaw (`g_yawStartSeg`) com guarda de 200 ticks e tolerância de 0,5° (89,5°); K_SYNC=0.15, IMU_KP_YAW_RETA=2.0; PWM clamp ±50 µs; giro pivô 35 RPM.
 - **Dashboard:** quadrado ideal usando coordenadas reais (500 mm); rastro real em verde com odometria cumulativa; indicador de pose (X, Y, θ) numérico; seta de direção corrigida.
 - **Documentação:** README atualizado com resumo das mudanças.

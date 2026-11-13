@@ -20,8 +20,8 @@ O sistema executa com extrema repetibilidade e controle em malha fechada uma tra
   * **Ponte ESP-NOW (ESP32-S3 Super Mini):** Firmware dedicado em `gateway_espnow/` para operação transparente via rádio 2.4 GHz em campo ou bancada sem necessidade de roteador Wi-Fi.
   * **Monitor e Logger Python:** Utilitário assíncrono em `robo_monitor/` para gravação e análise automatizada de corridas.
 * **Fusão Sensorial e Orientação Absoluta (IMU Bosch BMI160):**
-  * Correção giroscópica contínua em retas (`IMU_KP_YAW_RETA = 1.2`) reduzindo o desvio angular para menos de 2°.
-  * Parada exata de pivô por integração de Yaw (`|yaw| >= 88.0°`), eliminando erros de derrapagem nas curvas de 90°.
+  * Correção giroscópica contínua em retas (`IMU_KP_YAW_RETA = 2.0`) reduzindo o desvio angular para menos de 1°.
+  * Parada exata de pivô por delta de Yaw (`|deltaYaw| >= 89.5°`), eliminando erros de derrapagem nas curvas de 90°.
 * **Compensação Dinâmica de Zona Morta e Atrito:**
   * Feedforward otimizado (`ESC_DEADBAND_US = 110 µs`) eliminando tempo de estol na partida e permitindo arrancada instantânea em t=0.
 * **Periféricos Nativos de Silício (ESP-IDF):**
@@ -95,8 +95,8 @@ Teste_car_0/
 - **Origem da odometria:** ponto inicial fixado em **(500 mm, 0)**.
 - **Ângulos de base específicos por lado:** cálculo de `baseDeg` agora depende do lado da roda, corrigindo a direção esperada.
 - **Correção de sinal da seta de orientação:** durante pivôs, a seta agora usa `curHeadingDeg = baseDeg - d.yaw` (antes `+`).
-- **Ganho de controle reforçado:** `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0` para reduzir desvio em retas.
-- **Clamping de PWM ampliado:** now ±50 µs (antes ±30 µs).
+- **Ganho de controle reforçado:** `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0` para reduzir desvio em retas; pivô com corte em 89,5° e roda calibrada em 66 mm.
+- **Clamping de PWM ampliado:** agora ±50 µs (antes ±30 µs).
 
 ### Dashboard Web
 - **Desenho do quadrado ideal:** agora utiliza as coordenadas reais (500 mm × 500 mm) e segue a sequência **Início → L1 → L2 → L3 → Início**.
