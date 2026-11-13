@@ -112,6 +112,14 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
   .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px}
   .card h2{font-size:.8rem;color:#8b949e;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
   canvas{width:100%!important;max-height:200px}
+  /* ---- Mapa de trajetória ---- */
+  .map-card{max-width:440px;margin:0 auto 14px}
+  #cMap{width:min(100%,400px)!important;max-height:none;aspect-ratio:1;background:#0d1117;border-radius:6px;display:block;margin:0 auto}
+  .map-legend{display:flex;align-items:center;gap:12px;margin-top:8px;font-size:.72rem;color:#8b949e;flex-wrap:wrap}
+  .map-legend i{display:inline-block;vertical-align:middle;margin-right:2px}
+  .map-legend i.bl{width:14px;height:3px;border-radius:2px;background:#388bfd}
+  .map-legend i.gr{width:14px;height:3px;border-radius:2px;background:#3fb950}
+  .map-legend i.or{width:8px;height:8px;border-radius:50%;background:#f0883e}
 </style>
 </head>
 <body>
@@ -127,6 +135,16 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
 </div>
 
 <div id="charts">
+  <div class="card map-card">
+    <h2>Mapa — Trajetória Real × Ideal</h2>
+    <canvas id="cMap" width="400" height="400"></canvas>
+    <div class="map-legend">
+      <span><i class="bl"></i> Ideal (500mm)</span>
+      <span><i class="gr"></i> Real</span>
+      <span><i class="or"></i> Posição</span>
+      <button class="btn" onclick="resetMap()" style="margin-left:auto;background:#21262d;color:#8b949e;font-size:.72rem;padding:3px 10px;border:1px solid #30363d">↺ Reset</button>
+    </div>
+  </div>
   <div class="card"><h2>RPM (Esq / Dir)</h2><canvas id="cRpm"></canvas></div>
   <div class="card"><h2>Yaw (°)</h2>        <canvas id="cYaw"></canvas></div>
   <div class="card"><h2>PWM µs (M1 / M2)</h2><canvas id="cPwm"></canvas></div>
@@ -138,6 +156,179 @@ const csvRows = [];
 
 // ---- Janela deslizante (15 s a 5 Hz = 75 amostras) ----
 const WIN = 75;
+
+// ---- Odometria / Mapa 2D ----
+const MM_PER_TICK = 0.04799656; // 66mm diametro / 4320 ticks
+let posX = 0, posY = 0, theta = 0; // mm e radianos (0 rad = +X ou +Y)
+let prevTicks = 0, prevSegSide = -1, prevSegState = '';
+let trajectory = [{x: 0, y: 0}];
+let headingRad = 0; // orientação global acumulada
+
+function resetMap() {
+  posX = 0; posY = 0; theta = 0; headingRad = 0;
+  prevTicks = 0; prevSegSide = -1; prevSegState = '';
+  trajectory = [{x: 0, y: 0}];
+  drawMap();
+}
+
+function updateOdometry(d) {
+  const curAvgTicks = (d.t1 + d.t2) / 2;
+  
+  // Detecta reinício de segmento
+  if (d.sd !== prevSegSide || d.st !== prevSegState) {
+    prevTicks = curAvgTicks;
+    prevSegSide = d.sd;
+    prevSegState = d.st;
+    // Se voltou para o Lado 1 iniciando reta após concluído, reseta trajetória
+    if (d.st === 'RETA' && d.sd === 1 && trajectory.length > 50) {
+      posX = 0; posY = 0; headingRad = 0;
+      trajectory = [{x: 0, y: 0}];
+    }
+  }
+
+  const deltaTicks = curAvgTicks - prevTicks;
+  if (deltaTicks > 0) {
+    const deltaDist = deltaTicks * MM_PER_TICK;
+    
+    // Na curva pivô, o robô roda sobre o próprio eixo
+    // Na reta, desloca na direção atual baseada no lado e yaw
+    if (d.st === 'RETA') {
+      // Base heading por lado: L1: 0° (+Y), L2: 90° (+X), L3: 180° (-Y), L4: 270° (-X)
+      // d.yaw é o desvio relativo ao início da reta (graus)
+      let baseDeg = 0;
+      if (d.sd === 1) baseDeg = 0;        // Para cima (+Y)
+      else if (d.sd === 2) baseDeg = 90;  // Para direita (+X)
+      else if (d.sd === 3) baseDeg = 180; // Para baixo (-Y)
+      else if (d.sd === 4) baseDeg = 270; // Para esquerda (-X)
+      
+      const currentAngleRad = ((baseDeg + d.yaw) * Math.PI) / 180.0;
+      headingRad = currentAngleRad;
+      
+      posX += deltaDist * Math.sin(currentAngleRad);
+      posY += deltaDist * Math.cos(currentAngleRad);
+      trajectory.push({x: posX, y: posY});
+    } else if (d.st === 'PIVO') {
+      let baseDeg = 0;
+      if (d.sd === 1) baseDeg = 0;
+      else if (d.sd === 2) baseDeg = 90;
+      else if (d.sd === 3) baseDeg = 180;
+      else if (d.sd === 4) baseDeg = 270;
+      
+      headingRad = ((baseDeg + d.yaw) * Math.PI) / 180.0;
+    }
+    prevTicks = curAvgTicks;
+  }
+}
+
+function drawMap() {
+  const canvas = document.getElementById('cMap');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  
+  ctx.clearRect(0, 0, w, h);
+  
+  // Grade de fundo suave (100mm por quadrícula)
+  ctx.save();
+  ctx.strokeStyle = '#161b22';
+  ctx.lineWidth = 1;
+  const margin = 50;
+  const mapSize = 500; // Quadrado ideal de 500mm
+  const scale = (w - 2 * margin) / 600; // Escala: 600mm cabe com folga
+  
+  // Transformação: Origem (0,0) fica no canto inferior esquerdo do quadrado
+  // Canvas: X_screen = origX + x * scale
+  //         Y_screen = origY - y * scale (eixo Y invertido no canvas)
+  const origX = margin + 50 * scale;
+  const origY = h - margin - 50 * scale;
+  
+  function toScreen(x, y) {
+    return { x: origX + x * scale, y: origY - y * scale };
+  }
+  
+  // Linhas de grade
+  ctx.strokeStyle = '#21262d';
+  for (let gx = -100; gx <= 600; gx += 100) {
+    const p1 = toScreen(gx, -100), p2 = toScreen(gx, 600);
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+  }
+  for (let gy = -100; gy <= 600; gy += 100) {
+    const p1 = toScreen(-100, gy), p2 = toScreen(600, gy);
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+  }
+  
+  // 1. Quadrado Ideal (500x500 mm) em Azul tracejado
+  // L1: (0,0) -> (0,500)
+  // L2: (0,500) -> (500,500)
+  // L3: (500,500) -> (500,0)
+  // L4: (500,0) -> (0,0)
+  const p0 = toScreen(0, 0);
+  const pTopLeft = toScreen(0, 500);
+  const pTopRight = toScreen(500, 500);
+  const pBottomRight = toScreen(500, 0);
+  
+  ctx.strokeStyle = '#388bfd';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(p0.x, p0.y);
+  ctx.lineTo(pTopLeft.x, pTopLeft.y);
+  ctx.lineTo(pTopRight.x, pTopRight.y);
+  ctx.lineTo(pBottomRight.x, pBottomRight.y);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // Rótulo dos Vértices ideais
+  ctx.fillStyle = '#58a6ff';
+  ctx.font = '10px "Segoe UI", sans-serif';
+  ctx.fillText('Início (0,0)', p0.x - 20, p0.y + 15);
+  ctx.fillText('L1 (500mm)', pTopLeft.x - 20, pTopLeft.y - 8);
+  ctx.fillText('L2 (500mm)', pTopRight.x - 10, pTopRight.y - 8);
+  ctx.fillText('L3 (500mm)', pBottomRight.x - 10, pBottomRight.y + 15);
+  
+  // 2. Trajetória Real Percorrida (Rastro Verde)
+  if (trajectory.length > 1) {
+    ctx.strokeStyle = '#3fb950';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    const sp0 = toScreen(trajectory[0].x, trajectory[0].y);
+    ctx.moveTo(sp0.x, sp0.y);
+    for (let i = 1; i < trajectory.length; i++) {
+      const sp = toScreen(trajectory[i].x, trajectory[i].y);
+      ctx.lineTo(sp.x, sp.y);
+    }
+    ctx.stroke();
+  }
+  
+  // 3. Posição Atual do Robô (Ponto Laranja com vetor de orientação)
+  const curPos = toScreen(posX, posY);
+  
+  // Triângulo ou Círculo indicador do Robô
+  ctx.fillStyle = '#f0883e';
+  ctx.beginPath();
+  ctx.arc(curPos.x, curPos.y, 6, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Vetor de direção (orientação do robô)
+  const arrowLen = 18;
+  const arrowX = curPos.x + arrowLen * Math.sin(headingRad);
+  const arrowY = curPos.y - arrowLen * Math.cos(headingRad);
+  ctx.strokeStyle = '#ffa657';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(curPos.x, curPos.y);
+  ctx.lineTo(arrowX, arrowY);
+  ctx.stroke();
+  
+  // Coordenadas em texto
+  ctx.fillStyle = '#c9d1d9';
+  ctx.font = '11px "Segoe UI", monospace';
+  ctx.fillText(`X: ${posX.toFixed(0)} mm | Y: ${posY.toFixed(0)} mm`, 10, 20);
+  ctx.fillText(`θ: ${((headingRad * 180 / Math.PI) % 360).toFixed(1)}°`, 10, 36);
+  
+  ctx.restore();
+}
 
 function mkDs(label, color, dash){
   return {label, data:[], borderColor:color, backgroundColor:'transparent',
@@ -202,6 +393,9 @@ function handle(d){
   pushPoint(charts.rpm, t, d.r1, d.r2);
   pushPoint(charts.yaw, t, d.yaw);
   pushPoint(charts.pwm, t, d.w1, d.w2);
+  // Atualiza mapa 2D
+  updateOdometry(d);
+  drawMap();
   // CSV buffer
   csvRows.push([d.ts,d.st,d.sd,d.of,d.yaw,d.r1,d.r2,d.t1,d.t2,d.tg,d.w1,d.w2,d.rt]);
 }
@@ -219,6 +413,7 @@ function downloadCsv(){
 }
 
 connect();
+drawMap();
 </script>
 </body>
 </html>

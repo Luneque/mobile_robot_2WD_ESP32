@@ -116,16 +116,22 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 10. Etapa 10: Recalibração Cinemática do Diâmetro de Rodas (66 mm) e Suavização de Pivô (13/11/2026)
+### 10. Etapa 10: Recalibração Cinemática (66 mm), Blindagem de Pivô e Mapa 2D de Trajetória (13/11/2026)
 * **Constatação Física:** O par de rodas instalado no chassi possui bitola/diâmetro real de **66,0 mm** (e não 70,0 mm da especificação original).
 * **Impacto Odométrico e Cinemático:**
   * Circunferência real recalculada: $C = \pi \times 66,0 = \mathbf{207,345\text{ mm}}$ (antes era $219,911\text{ mm}$).
   * Resolução linear recalculada: $\text{MM\_POR\_PULSO} = \frac{207,345}{4320} \approx \mathbf{0,047997\text{ mm/pulso}}$ (antes era $0,050905\text{ mm/pulso}$).
   * Meta de ticks para reta de 500 mm: $\frac{500}{0,047997} \approx \mathbf{10.417\text{ pulsos}}$ (antes parava em 9.822 pulsos, percorrendo apenas ~471 mm e ficando curto).
   * Meta de ticks de arco por roda no pivô de 90°: $\frac{\pi \times 120 / 4}{0,047997} \approx \mathbf{1.964\text{ pulsos}}$ (antes calculava 1.851 pulsos).
-* **Mitigação do Overshoot no Pivô:**
-  * Redução da velocidade alvo do pivô de 50 RPM para **35 RPM** (`VELOCIDADE_GIRO_RPM = 35.0f`), diminuindo a energia cinética e a inércia rotacional durante o corte de potência a 89,0°.
-  * Com essa alteração, o robô para exatamente nos 90° nominais sem derrapagem excessiva.
+* **Mitigação do Overshoot e Guarda de Movimento no Pivô:**
+  * Redução da velocidade alvo do pivô de 50 RPM para **35 RPM** (`VELOCIDADE_GIRO_RPM = 35.0f`), diminuindo a energia cinética e a inércia rotacional no corte de potência a 89,0°.
+  * **Guarda Mínima de 200 ticks (`MIN_TICKS_PIVO`):** Elimina condição de corrida na qual o giroscópio ainda carregava yaw residual da pausa anterior e disparava término prematuro a 0° de rotação real. Homologação subsequente registrou **12 pivôs consecutivos sem falhas (média de 89,14°)**.
+* **Compensação de Drift M2 > M1:**
+  * Ajuste de `K_SYNC` de 0.08 para **0.12** (+50%), reduzindo a assimetria sistemática do motor direito de ~102 ticks para 86 ticks e estabilizando o desvio de rumo em retas para **0,59° médio**.
+* **Visualizador 2D de Trajetória no Dashboard (`wifi_telemetry.h`):**
+  * Implementação de elemento Canvas HTML5 de alta fidelidade desenhando o percurso ideal do quadrado (500×500 mm) em linha tracejada azul.
+  * Reconstrução contínua da trajetória (*dead reckoning*) plotada em linha verde com base no odômetro calibrado e yaw relativo.
+  * Indicador de pose do robô (ponto de localização + vetor direcional) com exibição numérica das coordenadas $(X, Y)$ em mm e ângulo $\theta$ em graus, além de botão para reset da visualização.
 
 ---
 
