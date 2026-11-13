@@ -191,19 +191,19 @@ function updateOdometry(d) {
   
   // Geometria real homologada:
   // Início (500, 0) -> L1 (500, 500) -> L2 (0, 500) -> L3 (0, 0) -> Início (500, 0)
-  // L1: sobe (+Y)            -> 0°
-  // L2: vai para esquerda (-X) -> 270°
-  // L3: desce (-Y)           -> 180°
-  // L4: vai para direita (+X)  -> 90°
+  // L1: sobe (+Y)              -> base 0°
+  // L2: vai para esquerda (-X) -> base 270°
+  // L3: desce (-Y)             -> base 180°
+  // L4: vai para direita (+X)  -> base 90°
   let baseDeg = 0;
   if (d.sd === 1) baseDeg = 0;
   else if (d.sd === 2) baseDeg = 270;
   else if (d.sd === 3) baseDeg = 180;
   else if (d.sd === 4) baseDeg = 90;
 
-  curHeadingDeg = (baseDeg + d.yaw);
-
   if (d.st === 'RETA') {
+    // Na reta, o desvio yaw positivo gira para a direita (+deg)
+    curHeadingDeg = (baseDeg + d.yaw);
     if (deltaTicks > 0) {
       const deltaDist = deltaTicks * MM_PER_TICK;
       const rad = (curHeadingDeg * Math.PI) / 180.0;
@@ -213,6 +213,9 @@ function updateOdometry(d) {
       prevTicks = curAvgTicks;
     }
   } else if (d.st === 'PIVO') {
+    // No pivô CCW (giro à esquerda), d.yaw vai de 0 a +90°.
+    // A orientação do robô transiciona suavemente de baseDeg para (baseDeg - 90°)
+    curHeadingDeg = (baseDeg - d.yaw);
     prevTicks = curAvgTicks;
   }
 }

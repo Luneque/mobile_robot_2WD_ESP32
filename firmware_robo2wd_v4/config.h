@@ -64,13 +64,13 @@
 #define PID_KD_M2          0.02f
 
 // Ganho de sincronismo cruzado entre rodas (Cross-Coupling Synchronization)
-#define K_SYNC             0.12f   // Aumentado de 0.08 para corrigir drift sistemático M2>M1 (~100 ticks por reta)
+#define K_SYNC             0.15f   // Aumentado para 0.15 para reforçar o acoplamento contra assimetria mecânica M2>M1
 
 // ==========================================
 // 4.1 FUSÃO SENSORIAL E CONTROLE ANGULAR COM IMU (BMI160)
 // ==========================================
 #define IMU_HABILITADA     true     // Habilita a correcao por giroscopio
-#define IMU_KP_YAW_RETA    1.2f     // Ganho reforcado para manter rumo estavel em linha reta
+#define IMU_KP_YAW_RETA    2.0f     // Reforçado de 1.2 para 2.0 para eliminar desvios angulares em retas com perturbação no solo
 #define CONTROL_LOOP_MS    20       // Período de amostragem do loop de controle (20ms = 50Hz)
 
 // ==========================================
