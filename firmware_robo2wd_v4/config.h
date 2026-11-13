@@ -80,7 +80,7 @@
 #define LADO_QUADRADO_MM   500.0f   // Comprimento de cada lado em mm (50 cm)
 #define ANGULO_CURVA_GRAUS 90.0f    // Ângulo de cada curva em graus
 
-#define VELOCIDADE_CRUZEIRO_RPM 55.0f // Velocidade alvo calibrada para retas (~201 mm/s, teto fisico nominal sob carga 1:90)
+#define VELOCIDADE_CRUZEIRO_RPM 40.0f // Velocidade alvo calibrada e homologada em solo (~146 mm/s, aderente ao percurso de 500 mm)
 #define VELOCIDADE_MIN_RPM      20.0f // Velocidade mínima de rampa (para não estolar)
 #define VELOCIDADE_GIRO_RPM     50.0f // Velocidade alvo para curvas em pivô central (~1,3 s por giro)
 #define PAUSA_ENTRE_MOVIMENTOS_MS 800 // Pausa de estabilização entre movimentos

@@ -106,7 +106,7 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | Parâmetro | Macro no Código | Valor Homologado | Efeito Funcional |
 | :--- | :--- | :---: | :--- |
 | **Resolução Efetiva** | `PPR_EFETIVO` | `4320.0f` | pulsos por volta completa da roda |
-| **Velocidade de Cruzeiro** | `VELOCIDADE_CRUZEIRO_RPM` | `80.0f` | $\approx 293\text{ mm/s}$ (~2,50 s por lado de 500 mm) |
+| **Velocidade de Cruzeiro** | `VELOCIDADE_CRUZEIRO_RPM` | `40.0f` | $\approx 146\text{ mm/s}$ (~4,8 a 5,0 s por lado de 500 mm em solo real) |
 | **Velocidade Mínima de Rampa** | `VELOCIDADE_MIN_RPM` | `20.0f` | Garante torque inicial sem estolar o motor |
 | **Velocidade de Curva** | `VELOCIDADE_GIRO_RPM` | `50.0f` | $\approx 0,52\text{ s}$ por giro de 90° |
 | **Rampa de Aceleração** | `RAMPA_ACEL_DIST_MM` | `50.0f` | Aceleração ágil ($\approx 600\text{ mm/s}^2$) sem patinar |
@@ -154,4 +154,5 @@ stateDiagram-v2
 
 * **v1.0.0 (Legado - `legacy/firmware_robo2wd/`):** Utilizava PWM via LEDC e leitura de encoders por interrupções de software (`attachInterrupt`). Apresentava gargalo de CPU e perda de pulsos.
 * **v2.0.0 (Legado - `legacy/firmware_robo2wd_v2/`):** Migrou para MCPWM e PCNT em hardware, comprovando a redução real de 1:90 ($4.320\text{ pulsos/volta}$) e introduzindo o sincronismo cruzado. Execução em loops bloqueantes dentro do `setup()`.
-* **v3.0.0 (OFICIAL - `firmware_robo2wd_v4/`):** Arquitetura definitiva não-bloqueante no `loop()`, perfil trapezoidal de velocidade otimizado para 80 RPM, Task Watchdog Timer reconfigurado e checagem de stall em retas e curvas.
+* **v3.0.0 (Legado - `legacy/firmware_robo2wd_v3/`):** Arquitetura não-bloqueante no `loop()`, perfil trapezoidal e integração inicial da IMU BMI160 com telemetria por cabo serial.
+* **v4.0.0 (OFICIAL - `firmware_robo2wd_v4/`):** Telemetria sem fio contínua via Wi-Fi/WebSocket (5 Hz), Dashboard Web embarcado em PROGMEM, comandos START/STOP remotos, feedforward de zona morta calibrado em 110 µs, cruzeiro homologado em 40 RPM e giro pivô com corte em 89,0° (parada exata a 90,0°).
