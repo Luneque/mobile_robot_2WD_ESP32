@@ -116,7 +116,20 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 10. Resumo da Estrutura Atual do Repositório
+### 10. Etapa 10: Recalibração Cinemática do Diâmetro de Rodas (66 mm) e Suavização de Pivô (13/11/2026)
+* **Constatação Física:** O par de rodas instalado no chassi possui bitola/diâmetro real de **66,0 mm** (e não 70,0 mm da especificação original).
+* **Impacto Odométrico e Cinemático:**
+  * Circunferência real recalculada: $C = \pi \times 66,0 = \mathbf{207,345\text{ mm}}$ (antes era $219,911\text{ mm}$).
+  * Resolução linear recalculada: $\text{MM\_POR\_PULSO} = \frac{207,345}{4320} \approx \mathbf{0,047997\text{ mm/pulso}}$ (antes era $0,050905\text{ mm/pulso}$).
+  * Meta de ticks para reta de 500 mm: $\frac{500}{0,047997} \approx \mathbf{10.417\text{ pulsos}}$ (antes parava em 9.822 pulsos, percorrendo apenas ~471 mm e ficando curto).
+  * Meta de ticks de arco por roda no pivô de 90°: $\frac{\pi \times 120 / 4}{0,047997} \approx \mathbf{1.964\text{ pulsos}}$ (antes calculava 1.851 pulsos).
+* **Mitigação do Overshoot no Pivô:**
+  * Redução da velocidade alvo do pivô de 50 RPM para **35 RPM** (`VELOCIDADE_GIRO_RPM = 35.0f`), diminuindo a energia cinética e a inércia rotacional durante o corte de potência a 89,0°.
+  * Com essa alteração, o robô para exatamente nos 90° nominais sem derrapagem excessiva.
+
+---
+
+### 11. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.

@@ -69,10 +69,11 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 - **Resolução Efetiva Homologada:** **4.320 pulsos por volta completa da roda** ($12 \times 90 \times 4 = 4.320$).
 
 #### 3.4 Geometria e Cinemática do Robô
-- **Diâmetro das Rodas ($D$):** $70,0\text{ mm}$ (7 cm).
-- **Circunferência da Roda ($C$):** $\pi \times 70,0 = 219,911\text{ mm}$.
-- **Resolução Linear de Deslocamento:** $\frac{219,911\text{ mm}}{4.320\text{ pulsos}} \approx 0,0509\text{ mm/pulso}$.
+- **Diâmetro das Rodas ($D$):** **$66,0\text{ mm}$** (6,6 cm — calibrado conforme conjunto de rodas atual).
+- **Circunferência da Roda ($C$):** $\pi \times 66,0 = \mathbf{207,345\text{ mm}}$.
+- **Resolução Linear de Deslocamento:** $\frac{207,345\text{ mm}}{4.320\text{ pulsos}} \approx \mathbf{0,047997\text{ mm/pulso}}$ (~10.417 pulsos para 500 mm).
 - **Bitola entre Rodas ($L$):** $120,0\text{ mm}$ (12 cm).
+- **Arco da Roda no Pivô de 90°:** $\frac{\pi \times 120,0}{4} \approx 94,248\text{ mm}$ ($\approx \mathbf{1.964\text{ pulsos}}$ por roda).
 
 ---
 
@@ -106,9 +107,10 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | Parâmetro | Macro no Código | Valor Homologado | Efeito Funcional |
 | :--- | :--- | :---: | :--- |
 | **Resolução Efetiva** | `PPR_EFETIVO` | `4320.0f` | pulsos por volta completa da roda |
-| **Velocidade de Cruzeiro** | `VELOCIDADE_CRUZEIRO_RPM` | `40.0f` | $\approx 146\text{ mm/s}$ (~4,8 a 5,0 s por lado de 500 mm em solo real) |
+| **Diâmetro da Roda** | `DIAMETRO_RODA_MM` | `66.0f` | Roda real calibrada (circunferência de ~207,35 mm) |
+| **Velocidade de Cruzeiro** | `VELOCIDADE_CRUZEIRO_RPM` | `55.0f` | $\approx 190\text{ mm/s}$ nominal (~40 RPM real com momento estável em solo) |
 | **Velocidade Mínima de Rampa** | `VELOCIDADE_MIN_RPM` | `20.0f` | Garante torque inicial sem estolar o motor |
-| **Velocidade de Curva** | `VELOCIDADE_GIRO_RPM` | `50.0f` | $\approx 0,52\text{ s}$ por giro de 90° |
+| **Velocidade de Curva** | `VELOCIDADE_GIRO_RPM` | `35.0f` | $\approx 1,4\text{ s}$ por giro pivô de 90° (suavizado para evitar overshoot) |
 | **Rampa de Aceleração** | `RAMPA_ACEL_DIST_MM` | `50.0f` | Aceleração ágil ($\approx 600\text{ mm/s}^2$) sem patinar |
 | **Rampa de Desaceleração** | `RAMPA_DESACEL_DIST_MM` | `60.0f` | Frenagem progressiva cravada na marca |
 | **Rampa de Giro (Acel/Desacel)**| `RAMPA_CURVA_ACEL/DESACEL` | `10.0° / 15.0°` | Transição suave no pivô de 90° |

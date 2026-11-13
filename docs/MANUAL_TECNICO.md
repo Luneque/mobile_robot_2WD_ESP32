@@ -75,10 +75,10 @@ A versão oficial do firmware (**Versão 4**) opera com:
 $$\text{PPR}_{\text{efetivo}} = 12 \text{ PPR} \times 90 \text{ (Redução)} \times 4\text{x} = \mathbf{4.320 \text{ pulsos/volta}}$$
 
 ### 3.2 Deslocamento Linear e Angular
-* **Circunferência da Roda ($70\text{ mm}$ de diâmetro):** $\pi \times 70 \approx \mathbf{219,911\text{ mm}}$
-* **Resolução Linear ($K_{\text{dist}}$):** $\frac{219,911\text{ mm}}{4.320\text{ pulsos}} \approx \mathbf{0,050905\text{ mm/pulso}}$
+* **Circunferência da Roda ($66\text{ mm}$ de diâmetro real):** $\pi \times 66 \approx \mathbf{207,345\text{ mm}}$
+* **Resolução Linear ($K_{\text{dist}}$):** $\frac{207,345\text{ mm}}{4.320\text{ pulsos}} \approx \mathbf{0,047997\text{ mm/pulso}}$ ($\approx 10.417\text{ pulsos}$ por reta de 500 mm)
 * **Bitola entre Rodas ($L$):** $120,0\text{ mm}$
-* **Arco de Giro para Curva de 90°:** $\pi \times 120 \times 0,25 \approx \mathbf{94,248\text{ mm}}$ ($\approx 1.851\text{ pulsos por roda}$)
+* **Arco de Giro para Curva de 90°:** $\frac{\pi \times 120 \times 90^\circ}{360^\circ} \approx \mathbf{94,248\text{ mm}}$ ($\approx \mathbf{1.964\text{ pulsos}}$ por roda)
 
 ---
 
@@ -87,8 +87,8 @@ $$\text{PPR}_{\text{efetivo}} = 12 \text{ PPR} \times 90 \text{ (Redução)} \ti
 A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/):
 
 ### 4.1 Módulos do Sistema
-* **[`config.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/config.h):** Centraliza pinos, limites de pulso do ESC ($1150\,\mu\text{s}$ a $1850\,\mu\text{s}$), parâmetros cinemáticos, distâncias de rampa, parâmetros do WDT e ganhos de fusão com a IMU (`IMU_KP_YAW_RETA`).
-* **[`imu_bmi160.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/imu_bmi160.h):** Driver nativo I2C (400 kHz) para a IMU Bosch BMI160. Fornece calibração estática de *bias* do giroscópio, inversão de polaridade (giro horário = Yaw positivo) e integração de ângulo de guinada (*Yaw*). O firmware usa `yawError = yawAtual` (erro relativo ao início de cada segmento, pois `resetYaw()` zera o ângulo) para correção de rumo em retas (`IMU_KP_YAW_RETA = 1.2`). No pivô, a IMU atua pelo critério de parada (`|yawError| ≥ (ânguloAlvo − 2°)`) e pelo mapeamento do perfil trapezoidal; o sincronismo cruzado é feito apenas pelos encoders. O acelerômetro é inicializado pelo driver (ODR 100 Hz, ±2 g), mas não é lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura.
+* **[`config.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/config.h):** Centraliza pinos, limites de pulso do ESC ($1150\,\mu\text{s}$ a $1850\,\mu\text{s}$), parâmetros cinemáticos (roda de 66 mm), distâncias de rampa, parâmetros do WDT e ganhos de fusão com a IMU (`IMU_KP_YAW_RETA`).
+* **[`imu_bmi160.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/imu_bmi160.h):** Driver nativo I2C (400 kHz) para a IMU Bosch BMI160. Fornece calibração estática de *bias* do giroscópio, inversão de polaridade (giro horário = Yaw positivo) e integração de ângulo de guinada (*Yaw*). O firmware usa `yawError = yawAtual` (erro relativo ao início de cada segmento, pois `resetYaw()` zera o ângulo) para correção de rumo em retas (`IMU_KP_YAW_RETA = 1.2`). No pivô, a IMU atua pelo critério de parada (`|yawError| ≥ (ânguloAlvo − 1.0°)`) e pelo mapeamento do perfil trapezoidal; o sincronismo cruzado é feito apenas pelos encoders. O acelerômetro é inicializado pelo driver (ODR 100 Hz, ±2 g), mas não é lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura.
 * **[`motor_control_mcpwm.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/motor_control_mcpwm.h):** Gerador determinístico de PWM a 50 Hz com resolução de $1\,\mu\text{s}$ via timer de 1 MHz.
 * **[`encoder_reader_pcnt.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/encoder_reader_pcnt.h):** Decodificador de pulsos com filtro anti-glitch de 1000 ns e filtro exponencial de velocidade (EMA).
 * **[`pid_controller.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/pid_controller.h):** Controlador PID com anti-windup e feedforward dinâmico de zona morta ($\pm 110\,\mu\text{s}$).
@@ -98,11 +98,11 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 * **Reta (500 mm):**
   * Acelera de 20 RPM até **55 RPM** nos primeiros **50 mm** ($\approx 600\text{ mm/s}^2$).
   * Mantém velocidade de cruzeiro estável por **390 mm** (78% da reta).
-  * Desacelera nos últimos **60 mm** para parada cravada na marca de 500 mm.
-  * Tempo total por reta: **$\approx 2,50\text{ s}$** (em 55 RPM).
+  * Desacelera nos últimos **60 mm** para parada cravada na marca de 500 mm (10.417 ticks).
+  * Tempo total por reta: **$\approx 4,8\text{ a }5,0\text{ s}$** em regime dinâmico real no solo.
 * **Curva Pivô (90°):**
-  * Acelera em 10° e desacelera em 15°, mantendo cruzeiro de **50 RPM** em 65° do giro.
-  * Tempo total por giro: **$\approx 1,80\text{ s}$** (com parada precisa a 89° e pausa).
+  * Acelera em 10° e desacelera em 15°, com cruzeiro suavizado de **35 RPM** no giro pivô.
+  * Tempo total por giro: **$\approx 1,4\text{ s}$** de movimento + 0,8 s de pausa = **$\approx 2,2\text{ s}$** (com parada precisa a 89° e amortecimento de inércia).
 
 ---
 

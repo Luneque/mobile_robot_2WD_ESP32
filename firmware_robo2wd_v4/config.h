@@ -33,9 +33,9 @@
 #define QUADRATURA_MULT    4.0f                 // Modo Quadratura 4x
 #define PPR_EFETIVO        4320.0f              // 4320 pulsos por volta completa da roda (12 * 90 * 4)
 
-#define DIAMETRO_RODA_MM   70.0f                // Diâmetro da roda em mm (7 cm)
-#define CIRCUNF_RODA_MM    (PI * DIAMETRO_RODA_MM) // ~219.911 mm por volta da roda
-#define MM_POR_PULSO       (CIRCUNF_RODA_MM / PPR_EFETIVO) // ~0.050905 mm por pulso
+#define DIAMETRO_RODA_MM   66.0f                // Diâmetro real calibrado da roda em mm (6.6 cm)
+#define CIRCUNF_RODA_MM    (PI * DIAMETRO_RODA_MM) // ~207.345 mm por volta da roda
+#define MM_POR_PULSO       (CIRCUNF_RODA_MM / PPR_EFETIVO) // ~0.04799656 mm por pulso (10417 ticks para 500 mm)
 #define DIST_RODAS_MM      120.0f               // Bitola entre rodas em mm (12 cm)
 
 // ==========================================
@@ -80,9 +80,9 @@
 #define LADO_QUADRADO_MM   500.0f   // Comprimento de cada lado em mm (50 cm)
 #define ANGULO_CURVA_GRAUS 90.0f    // Ângulo de cada curva em graus
 
-#define VELOCIDADE_CRUZEIRO_RPM 40.0f // Velocidade alvo calibrada e homologada em solo (~146 mm/s, aderente ao percurso de 500 mm)
+#define VELOCIDADE_CRUZEIRO_RPM 55.0f // Velocidade de cruzeiro dinamica ideal (~190 mm/s alvo, ~40 RPM real com momento estavel)
 #define VELOCIDADE_MIN_RPM      20.0f // Velocidade mínima de rampa (para não estolar)
-#define VELOCIDADE_GIRO_RPM     50.0f // Velocidade alvo para curvas em pivô central (~1,3 s por giro)
+#define VELOCIDADE_GIRO_RPM     35.0f // Velocidade alvo para curvas em pivô central suavizado (evita overshoot por inércia)
 #define PAUSA_ENTRE_MOVIMENTOS_MS 800 // Pausa de estabilização entre movimentos
 
 // Distâncias de aceleração e desaceleração para perfil trapezoidal (em mm)
