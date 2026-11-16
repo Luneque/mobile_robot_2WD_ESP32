@@ -132,6 +132,7 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
   <span id="segTxt">Lado — de 4</span>
   <button class="btn" id="btnStart" onclick="sendCmd('start')">▶ START</button>
   <button class="btn" id="btnCsv"   onclick="downloadCsv()">⬇ Download CSV</button>
+  <button class="btn" id="btnDump"  onclick="sendCmd('dump')">🗒 Dump RAM</button>
 </div>
 
 <div id="charts">
@@ -512,6 +513,13 @@ public:
     }
 
     // -------------------------------------------------------------------------
+    // sendRaw() — envia texto puro via WebSocket (para o dump do gravador)
+    // -------------------------------------------------------------------------
+    void sendRaw(const char* texto) {
+        if (hasClients()) _ws.broadcastTXT(texto);
+    }
+
+    // -------------------------------------------------------------------------
     // hasNewCommand() — retorna true se chegou novo comando via WS (consome flag)
     // -------------------------------------------------------------------------
     bool hasNewCommand() {
@@ -596,6 +604,9 @@ private:
                 } else if (msg == "reset" || msg == "r") {
                     _newCommand = true;
                     _lastCmd    = 'r';
+                } else if (msg == "dump" || msg == "d") {
+                    _newCommand = true;   // dispara o tratamento no loop principal
+                    _lastCmd    = 'd';    // dump do gravador de telemetria (RAM)
                 }
                 break;
             }

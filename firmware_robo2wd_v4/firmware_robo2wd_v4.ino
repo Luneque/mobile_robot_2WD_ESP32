@@ -6,6 +6,7 @@
 #include "imu_bmi160.h"
 #include "esp_task_wdt.h"
 #include "wifi_telemetry.h"
+#include "telemetry_recorder.h"
 #include "secrets.h"
 
 // =========================================================================
@@ -27,6 +28,18 @@ PIDController pid2(PID_KP_M2, PID_KI_M2, PID_KD_M2, ESC_MIN_US, ESC_MAX_US, ESC_
 WifiTelemetry wirelessTelem;
 bool g_wifiOk = false;
 uint32_t g_lastTelemTime = 0;
+
+// Gravador de telemetria em RAM (para testes sem cabo serial, ex.: robô no solo)
+TelemetryRecorder recorder;
+
+// Dump incremental via WebSocket (robô sem cabo)
+static bool     _dumpParaWs = false;
+static uint16_t _dumpIdx = 0;
+static uint16_t _dumpTotal = 0;
+static uint32_t _dumpUltimoEnvio = 0;
+static char     _dumpLinha[96];
+#define DUMP_WS_INTERVAL_MS 50
+#define DUMP_WS_POR_LOTE    10
 
 uint32_t g_lastPwm1 = ESC_NEUTRO_US;
 uint32_t g_lastPwm2 = ESC_NEUTRO_US;
@@ -183,9 +196,9 @@ void processarControleMovimento(uint32_t now) {
             // Guarda mínimo de ticks reais de encoder antes de aceitar o delta de yaw da IMU.
             const int32_t MIN_TICKS_PIVO = 200; // ~9.6mm de arco = confirmação de movimento real
             bool movimentoConfirmado = (avgTicks >= MIN_TICKS_PIVO);
-            // Parada antecipada em 89.5 deg para acomodar a inércia de frenagem a 35 RPM
+            // Parada antecipada para acomodar a inércia de frenagem (PIVO_ANTECIPACAO_GRAUS)
             atingiuMeta = movimentoConfirmado &&
-                          ((yawAbs >= (g_anguloTotalGraus - 0.5f)) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f)));
+                          ((yawAbs >= (g_anguloTotalGraus - PIVO_ANTECIPACAO_GRAUS)) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f)));
         } else {
             atingiuMeta = (avgTicks >= g_targetTicks);
         }
@@ -349,6 +362,45 @@ void enviarTelemetria(uint32_t now) {
 }
 
 // =========================================================================
+// GRAVADOR DE TELEMETRIA EM RAM (replay para testes sem cabo serial)
+// =========================================================================
+uint8_t codigoEstadoRecorder() {
+    switch (estadoAtual) {
+        case ESTADO_FALHA_HARDWARE:     return REC_EST_FALHA;
+        case ESTADO_ARMANDO_ESC:        return REC_EST_ARMANDO;
+        case ESTADO_AGUARDO_INICIO:     return REC_EST_AGUARDO;
+        case ESTADO_EXECUTANDO_TRAJETORIA: return g_emLinhaReta ? REC_EST_RETA : REC_EST_PIVO;
+        case ESTADO_CONCLUIDO:          return REC_EST_CONCLUIDO;
+        case ESTADO_EMERGENCIA:         return REC_EST_EMERGENCIA;
+        default:                        return REC_EST_AGUARDO;
+    }
+}
+
+void gravarAmostraRecorder(uint32_t now) {
+    // Não grava o estado CONCLUIDO/EMERGENCIA repetido: sem isso o buffer
+    // circular (100 s) enche de amostras idênticas e descarta o teste real.
+    static uint32_t _ultimoMov = 0;
+    if (estadoAtual == ESTADO_CONCLUIDO || estadoAtual == ESTADO_EMERGENCIA) {
+        // Grava no máximo 1 amostra de estado final a cada 2 s
+        if (now - _ultimoMov < 2000) return;
+        _ultimoMov = now;
+    }
+
+    float rpm1 = encoders.getRPM1();
+    float rpm2 = encoders.getRPM2();
+    int32_t t1  = abs(encoders.getTicksM1());
+    int32_t t2  = abs(encoders.getTicksM2());
+    float yaw   = imu.isInitialized() ? imu.getYawAngleDeg() : 0.0f;
+    float rpmAlvo = (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA)
+                        ? (g_emLinhaReta ? VELOCIDADE_CRUZEIRO_RPM : VELOCIDADE_GIRO_RPM)
+                        : 0.0f;
+
+    recorder.sample(now, codigoEstadoRecorder(), (uint8_t)g_ladoAtual,
+                   yaw, rpm1, rpm2, t1, t2, g_targetTicks,
+                   g_lastPwm1, g_lastPwm2, rpmAlvo);
+}
+
+// =========================================================================
 // SETUP
 // =========================================================================
 void setup() {
@@ -431,6 +483,12 @@ void setup() {
 
     estadoAtual = ESTADO_AGUARDO_INICIO;
     g_pausaStartTime = millis();
+
+    // 6. Inicialização do gravador de telemetria em RAM (replay de teste)
+    recorder.begin();
+    Serial.printf("[REC] Gravador de telemetria ativo: %d amostras a %d Hz (max %.0f s).\n",
+                  REC_MAX_SAMPLES, 1000 / REC_INTERVAL_MS, (float)REC_MAX_SAMPLES * REC_INTERVAL_MS / 1000.0f);
+    Serial.println(F("[REC] Envie 'd' (serial) ou 'dump' (WebSocket) para despejar o buffer em CSV."));
 }
 
 // =========================================================================
@@ -452,6 +510,86 @@ void loop() {
     // Envio periódico de telemetria sem fio (5 Hz)
     if (estadoAtual != ESTADO_FALHA_HARDWARE) {
         enviarTelemetria(now);
+        gravarAmostraRecorder(now);
+    }
+
+    // Comando de dump do gravador via Serial ('d') ou WebSocket ("dump")
+    if (Serial.available()) {
+        char c = Serial.read();
+        if (c == 'd' || c == 'D') {
+            _dumpParaWs = false;
+            recorder.dump();
+        }
+    }
+
+    // Envio incremental do dump via WebSocket (não bloqueia o loop)
+    if (_dumpParaWs && _dumpIdx < _dumpTotal) {
+        if (now - _dumpUltimoEnvio >= DUMP_WS_INTERVAL_MS) {
+            _dumpUltimoEnvio = now;
+            uint16_t fim = (uint16_t)min((uint16_t)(_dumpIdx + DUMP_WS_POR_LOTE), _dumpTotal);
+            for (uint16_t i = _dumpIdx; i < fim; i++) {
+                recorder.dumpSample(i, _dumpLinha, sizeof(_dumpLinha));
+                wirelessTelem.sendRaw(_dumpLinha);
+            }
+            _dumpIdx = fim;
+        }
+    } else if (_dumpParaWs && _dumpIdx >= _dumpTotal) {
+        _dumpParaWs = false;
+        wirelessTelem.sendRaw("[REC] Dump concluido.");
+    }
+
+    // Tratamento centralizado dos comandos de texto (start/stop/pause/reset/dump).
+    // Um UNICO ponto de consumo da flag: se dois blocos chamarem hasNewCommand(),
+    // o primeiro zera a flag e o segundo nunca vê o comando.
+    char cmdWs = '\0';
+    if (g_wifiOk && wirelessTelem.hasNewCommand()) {
+        cmdWs = wirelessTelem.getLastCommand();
+        Serial.print(F("[LOOP] comando WS: "));
+        Serial.println(cmdWs);
+    }
+
+    if (cmdWs != '\0') {
+        switch (cmdWs) {
+            case 's':  // start
+                if (estadoAtual == ESTADO_AGUARDO_INICIO || estadoAtual == ESTADO_CONCLUIDO) {
+                    Serial.println("\n>>> COMANDO RECEBIDO! INICIANDO TRAJETÓRIA DO QUADRADO <<<");
+                    recorder.clear();
+                    g_ladoAtual = 1;
+                    subEstado = SUB_INICIAR_SEGMENTO;
+                    g_emLinhaReta = true;
+                    estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
+                }
+                break;
+
+            case 'd':  // dump do gravador via WebSocket
+                _dumpParaWs = true;
+                _dumpIdx = 0;
+                _dumpTotal = recorder.count();
+                Serial.println(F("[REC] Dump remoto via WebSocket solicitado."));
+                break;
+
+            case 'x':  // stop
+            case 'p':  // pause
+                if (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA) {
+                    motors.stopAll();
+                    g_lastPwm1 = ESC_NEUTRO_US;
+                    g_lastPwm2 = ESC_NEUTRO_US;
+                    estadoAtual = ESTADO_CONCLUIDO;
+                    Serial.println("\n[PARADA REMOTA] Trajetoria interrompida via WebSocket!");
+                }
+                break;
+
+            case 'r':  // reset
+                recorder.clear();
+                g_ladoAtual = 1;
+                g_emLinhaReta = true;
+                subEstado = SUB_INICIAR_SEGMENTO;
+                estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
+                break;
+
+            default:
+                break;
+        }
     }
 
     switch (estadoAtual) {
@@ -475,7 +613,8 @@ void loop() {
             break;
 
         case ESTADO_AGUARDO_INICIO:
-            // Checa entrada via Serial (debug) OU WebSocket (comando remoto)
+            // Início por Serial (debug). O início remoto via WebSocket é tratado
+            // de forma centralizada no topo do loop().
             {
                 bool comandoRecebido = false;
                 if (Serial.available()) {
@@ -484,21 +623,20 @@ void loop() {
                         comandoRecebido = true;
                     }
                 }
-                if (g_wifiOk && wirelessTelem.hasNewCommand()) {
-                    char cmd = wirelessTelem.getLastCommand();
-                    if (cmd == 's') comandoRecebido = true;
-                }
                 if (comandoRecebido) {
                     Serial.println("\n>>> COMANDO RECEBIDO! INICIANDO TRAJETÓRIA DO QUADRADO <<<");
+                    recorder.clear(); // Descarta amostras do teste anterior
                     g_ladoAtual = 1;
                     subEstado = SUB_INICIAR_SEGMENTO;
                     g_emLinhaReta = true;
                     estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
                 }
             }
-            // Timeout automático de 5 segundos
-            if (now - g_pausaStartTime >= 5000) {
+            // Timeout automático de 5 segundos (apenas sem Wi-Fi: com Wi-Fi o
+            // início é remoto e o buffer do gravador deve ser preservado)
+            if (!g_wifiOk && now - g_pausaStartTime >= 5000) {
                 Serial.println("\n>>> TIMEOUT DE 5s ATINGIDO! INICIANDO TRAJETÓRIA DO QUADRADO <<<");
+                recorder.clear();
                 g_ladoAtual = 1;
                 subEstado = SUB_INICIAR_SEGMENTO;
                 g_emLinhaReta = true;
@@ -507,18 +645,7 @@ void loop() {
             break;
 
         case ESTADO_EXECUTANDO_TRAJETORIA:
-            // Interrupção remota via WebSocket (comando "stop" ou "pause")
-            if (g_wifiOk && wirelessTelem.hasNewCommand()) {
-                char cmd = wirelessTelem.getLastCommand();
-                if (cmd == 'x' || cmd == 'p') {
-                    motors.stopAll();
-                    g_lastPwm1 = ESC_NEUTRO_US;
-                    g_lastPwm2 = ESC_NEUTRO_US;
-                    estadoAtual = ESTADO_CONCLUIDO;
-                    Serial.println("\n[PARADA REMOTA] Trajetoria interrompida via WebSocket!");
-                    break;
-                }
-            }
+            // Stop/pause remotos são tratados de forma centralizada no topo do loop().
 
             if (subEstado == SUB_INICIAR_SEGMENTO) {
                 if (g_emLinhaReta) {
@@ -577,12 +704,9 @@ void loop() {
                         comandoRecebido = true;
                     }
                 }
-                if (g_wifiOk && wirelessTelem.hasNewCommand()) {
-                    char cmd = wirelessTelem.getLastCommand();
-                    if (cmd == 's') comandoRecebido = true;
-                }
                 if (comandoRecebido) {
                     Serial.println("\n>>> COMANDO RECEBIDO! REINICIANDO TRAJETÓRIA DO QUADRADO <<<");
+                    recorder.clear(); // Descarta amostras do teste anterior
                     g_ladoAtual = 1;
                     g_emLinhaReta = true;
                     subEstado = SUB_INICIAR_SEGMENTO;

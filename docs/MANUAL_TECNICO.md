@@ -16,8 +16,8 @@ A versão oficial do firmware (**Versão 4**) opera com:
 * **Conectividade Sem Fio e Telemetria em Tempo Real:** Wi-Fi Station, WebSocket Server a 5 Hz e Dashboard Web embarcado em memória flash (servido em `http://robo.local/`), permitindo visualização de gráficos de alta frequência e disparo remoto sem cabos.
 * **Gateway ESP-NOW:** Suporte ao microcontrolador auxiliar ESP32-S3 Super Mini para transmissão de telemetria sem necessidade de ponto de acesso Wi-Fi.
 * **Periféricos de Silício Dedicados:** **MCPWM** (50 Hz / resolução de $1\,\mu\text{s}$) e **PCNT** (decodificação de quadratura 4x por hardware com filtro anti-glitch de 1000 ns).
-* **Compensação Dinâmica de Zona Morta:** Feedforward calibrado em `110 µs` (`ESC_DEADBAND_US`), vencendo o atrito estático imediatamente na partida.
-* **Fusão Sensorial com IMU BMI160:** Correção contínua de rumo em linha reta (`IMU_KP_YAW_RETA = 2.0`) e controle estrito de parada de giro pivô por delta de yaw (corte em 89,5°).
+* **Compensação Dinâmica de Zona Morta:** Feedforward proporcional à velocidade, derivado da curva PWM×RPM medida em bancada e corrigido pelo fator de carga do robô no solo (`CURVA_FATOR_CARGA = 0.80`), vencendo o atrito estático já na partida.
+* **Fusão Sensorial com IMU BMI160:** Correção contínua de rumo em linha reta (`IMU_KP_YAW_RETA = 2.0`) e controle estrito de parada de giro pivô por delta de yaw (corte em 89,3°).
 
 ---
 
@@ -89,10 +89,10 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 ### 4.1 Módulos do Sistema
 * **[`config.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/config.h):** Centraliza pinos, limites de pulso do ESC ($1150\,\mu\text{s}$ a $1850\,\mu\text{s}$), parâmetros cinemáticos (roda de 66 mm), distâncias de rampa, parâmetros do WDT e ganhos de fusão com a IMU (`IMU_KP_YAW_RETA = 2.0`) e sincronismo cruzado (`K_SYNC = 0.15`).
 * **[`wifi_telemetry.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/wifi_telemetry.h):** Driver de conectividade Wi-Fi Station, servidor WebSocket (porta 81) e servidor HTTP (porta 80). Contém o Dashboard Web embarcado em PROGMEM com gráficos Chart.js e visualizador 2D da trajetória em tempo real (HTML5 Canvas).
-* **[`imu_bmi160.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/imu_bmi160.h):** Driver nativo I2C (400 kHz) para a IMU Bosch BMI160. Fornece calibração estática de *bias* do giroscópio, leitura direta do eixo Z (giro horário = Yaw positivo) e integração de ângulo de guinada (*Yaw*). O firmware usa o delta real de yaw (`deltaYaw = yawAtual − g_yawStartSeg`, capturado no início de cada segmento) para correção de rumo em retas (`IMU_KP_YAW_RETA = 2.0`). No pivô, a IMU atua pelo critério de parada (`|deltaYaw| ≥ (ânguloAlvo − 0,5°)`, corte em 89,5°) com guarda mínima de 200 ticks (`MIN_TICKS_PIVO`) para evitar disparos prematuros por resíduo de yaw; o sincronismo cruzado é feito apenas pelos encoders. O acelerômetro é inicializado pelo driver (ODR 100 Hz, ±2 g), mas não é lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura.
+* **[`imu_bmi160.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/imu_bmi160.h):** Driver nativo I2C (400 kHz) para a IMU Bosch BMI160. Fornece calibração estática de *bias* do giroscópio, leitura direta do eixo Z (giro horário = Yaw positivo) e integração de ângulo de guinada (*Yaw*). O firmware usa o delta real de yaw (`deltaYaw = yawAtual − g_yawStartSeg`, capturado no início de cada segmento) para correção de rumo em retas (`IMU_KP_YAW_RETA = 2.0`). No pivô, a IMU atua pelo critério de parada (`|deltaYaw| ≥ (ânguloAlvo − PIVO_ANTECIPACAO_GRAUS)`, corte em 89,3°) com guarda mínima de 200 ticks (`MIN_TICKS_PIVO`) para evitar disparos prematuros por resíduo de yaw; o sincronismo cruzado é feito apenas pelos encoders. O acelerômetro é inicializado pelo driver (ODR 100 Hz, ±2 g), mas não é lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura.
 * **[`motor_control_mcpwm.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/motor_control_mcpwm.h):** Gerador determinístico de PWM a 50 Hz com resolução de $1\,\mu\text{s}$ via timer de 1 MHz.
 * **[`encoder_reader_pcnt.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/encoder_reader_pcnt.h):** Decodificador de pulsos com filtro anti-glitch de 1000 ns e filtro exponencial de velocidade (EMA).
-* **[`pid_controller.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/pid_controller.h):** Controlador PID com anti-windup e feedforward dinâmico de zona morta ($\pm 110\,\mu\text{s}$).
+* **[`pid_controller.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/pid_controller.h):** Controlador PID com anti-windup e feedforward proporcional à velocidade, obtido por interpolação da curva PWM×RPM medida em bancada (`diag_motor_curve`) e corrigido pelo fator de carga (`CURVA_FATOR_CARGA`).
 * **[`firmware_robo2wd_v4.ino`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/firmware_robo2wd_v4.ino):** Máquina de estados não-bloqueante (`ESTADO_AGUARDO_INICIO`, `ESTADO_EXECUTANDO_TRAJETORIA`, `ESTADO_CONCLUIDO`, `ESTADO_EMERGENCIA`), perfil trapezoidal e fusão sensorial IMU + Encoders.
 
 ### 4.2 Dinâmica do Perfil Trapezoidal
@@ -100,10 +100,10 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
   * Acelera de 20 RPM até **55 RPM** nos primeiros **50 mm** ($\approx 600\text{ mm/s}^2$).
   * Mantém velocidade de cruzeiro estável por **390 mm** (78% da reta).
   * Desacelera nos últimos **60 mm** para parada cravada na marca de 500 mm (10.417 ticks).
-  * Tempo total por reta: **$\approx 4,8\text{ a }5,0\text{ s}$** em regime dinâmico real no solo.
+  * Tempo total por reta: **$\approx 3,7\text{ s}$** medido em solo (com feedforward por velocidade).
 * **Curva Pivô (90°):**
   * Acelera em 10° e desacelera em 15°, com cruzeiro suavizado de **35 RPM** no giro pivô.
-  * Tempo total por giro: **$\approx 1,4\text{ s}$** de movimento + 0,8 s de pausa = **$\approx 2,2\text{ s}$** (com parada precisa a 89,5° e amortecimento de inércia).
+  * Tempo total por giro: **$\approx 1,65\text{ s}$** de movimento + 0,8 s de pausa = **$\approx 2,45\text{ s}$** (medido em solo; corte em 89,3° com antecipação de 0,7°).
 
 ---
 
@@ -141,6 +141,6 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 
 ## 📄 Atualizações Recentes (13/11/2026)
 
-- **Firmware:** odometria recalibrada para roda de 66 mm (10.417 ticks por reta de 500 mm); corte de pivô por delta real de yaw (`g_yawStartSeg`) com guarda de 200 ticks e tolerância de 0,5° (corte em 89,5°); `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0`; limite de PWM ±50 µs; giro pivô suavizado para 35 RPM.
+- **Firmware:** odometria recalibrada para roda de 66 mm (10.417 ticks por reta de 500 mm); corte de pivô por delta real de yaw (`g_yawStartSeg`) com guarda de 200 ticks; `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0`; limite de PWM ±50 µs; giro pivô suavizado para 35 RPM.
 - **Dashboard Web:** quadrado ideal usando coordenadas reais (500 mm × 500 mm) em ordem **Início → L1 → L2 → L3 → Início**; rastro real em verde com odometria cumulativa; indicador de pose (X, Y, θ) numérico; seta de direção correta nos pivôs.
 - **Documentação:** README, Diário de Engenharia, FSD e este Manual agora contém o resumo das mudanças.

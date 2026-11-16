@@ -46,7 +46,12 @@
 // Limites em microssegundos (us)
 #define ESC_NEUTRO_US      1500     // Ponto neutro (motor parado)
 #define ESC_ARM_TEMPO_MS   3000     // Tempo segurando neutro no boot para armar o ESC
-#define ESC_DEADBAND_US    110.0f   // Feedforward de compensação de zona morta do ESC (ajustado de 50 para 110us)
+#define ESC_DEADBAND_US 110.0f // Zona morta do ESC (100 us medidos); piso do feedforward
+// Fator de carga da curva PWM x RPM: razao entre a velocidade sob carga (robo no solo)
+// e a velocidade sem carga (medida pelo diag_motor_curve). Corrige o feedforward por velocidade.
+// 0.75 -> 0.80: teste no solo com a curva nova deu 60.9 RPM (alvo 55); com 0.80 o
+// feedforward cai ~10us e o pico tende a ~56 RPM.
+#define CURVA_FATOR_CARGA 0.80f
 
 // Limites seguros operacionais
 #define ESC_MIN_US         1150     // Potência máxima permitida em ré
@@ -56,11 +61,11 @@
 // 4. PARÂMETROS DO CONTROLADOR PID E SINCRONISMO
 // ==========================================
 #define PID_KP_M1          1.8f
-#define PID_KI_M1          0.6f
+#define PID_KI_M1          1.5f   // 0.6 -> 1.5: curva PWM x RPM (diag_motor_curve) mostrou que 55 RPM precisa de ~1740us sob carga, acima do teto anterior do PID
 #define PID_KD_M1          0.02f
 
 #define PID_KP_M2          1.8f
-#define PID_KI_M2          0.6f
+#define PID_KI_M2          1.5f   // 0.6 -> 1.5: idem M1
 #define PID_KD_M2          0.02f
 
 // Ganho de sincronismo cruzado entre rodas (Cross-Coupling Synchronization)
@@ -79,6 +84,11 @@
 #define QUADRADO_LADOS     4
 #define LADO_QUADRADO_MM   500.0f   // Comprimento de cada lado em mm (50 cm)
 #define ANGULO_CURVA_GRAUS 90.0f    // Ângulo de cada curva em graus
+// Antecipação do corte do pivô (graus): a IMU para em 90° menos este valor para
+// acomodar a inércia de frenagem. Calibrado no solo: o yaw registrado congela no
+// instante do corte, e cada 0.1° de antecipação desloca o resultado em ~0.1°.
+// Teste com 0.2° deu 90.71° -> subir para 0.7° para aproximar de 90.0°.
+#define PIVO_ANTECIPACAO_GRAUS 0.7f
 
 #define VELOCIDADE_CRUZEIRO_RPM 55.0f // Velocidade de cruzeiro dinamica ideal (~190 mm/s alvo, ~40 RPM real com momento estavel)
 #define VELOCIDADE_MIN_RPM      20.0f // Velocidade mínima de rampa (para não estolar)

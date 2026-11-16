@@ -21,9 +21,9 @@ O sistema executa com extrema repetibilidade e controle em malha fechada uma tra
   * **Monitor e Logger Python:** Utilitário assíncrono em `robo_monitor/` para gravação e análise automatizada de corridas.
 * **Fusão Sensorial e Orientação Absoluta (IMU Bosch BMI160):**
   * Correção giroscópica contínua em retas (`IMU_KP_YAW_RETA = 2.0`) reduzindo o desvio angular para menos de 1°.
-  * Parada exata de pivô por delta de Yaw (`|deltaYaw| >= 89.5°`), eliminando erros de derrapagem nas curvas de 90°.
+  * Parada de pivô por delta de Yaw (`|deltaYaw| >= 89.3°`, antecipação de 0.7°), eliminando erros de derrapagem nas curvas de 90°.
 * **Compensação Dinâmica de Zona Morta e Atrito:**
-  * Feedforward otimizado (`ESC_DEADBAND_US = 110 µs`) eliminando tempo de estol na partida e permitindo arrancada instantânea em t=0.
+  * Feedforward proporcional à velocidade (curva PWM×RPM medida em bancada, corrigida por `CURVA_FATOR_CARGA = 0.80`), eliminando tempo de estol na partida e entregando pulso adequado em qualquer velocidade alvo.
 * **Periféricos Nativos de Silício (ESP-IDF):**
   * **MCPWM (Motor Control PWM):** Timer de 1 MHz dedicado gerando pulsos para ESC a 50 Hz com resolução de $1\,\mu\text{s}$.
   * **PCNT (Pulse Counter):** Decodificação por hardware de quadratura 4x com filtro digital de 1000 ns, desonerando 100% da CPU.
@@ -43,12 +43,15 @@ Teste_car_0/
 │   ├── motor_control_mcpwm.h  # Driver MCPWM (1 MHz, 50 Hz, 1 us)
 │   ├── encoder_reader_pcnt.h  # Driver PCNT (Quadratura 4x + Filtro EMA)
 │   ├── imu_bmi160.h           # Driver I2C nativo para IMU Bosch BMI160
-│   ├── pid_controller.h       # PID com Feedforward de zona morta e Anti-Windup
+│   ├── pid_controller.h       # PID com feedforward por velocidade e Anti-Windup
+│   ├── telemetry_recorder.h   # Gravador de telemetria em RAM (dump serial/WebSocket)
 │   └── firmware_robo2wd_v4.ino# FSM não-bloqueante, partida remota e telemetria 5Hz
 ├── gateway_espnow/            # [GATEWAY] Firmware para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB)
 │   └── gateway_espnow.ino
 ├── robo_monitor/              # [FERRAMENTAS PC] Scripts de recepção e análise de dados
-│   ├── robo_ws_logger.py      # Logger WebSocket assíncrono para terminal e CSV
+│   ├── robo_ws_logger.py      # Logger WebSocket assíncrono para terminal e CSV (+ --replay)
+│   ├── capturar_dump.py       # Captura o dump do gravador em RAM via serial
+│   ├── capturar_dump_wifi.py  # Captura o dump do gravador em RAM via WebSocket
 │   ├── requirements.txt       # Dependências Python (websockets, rich)
 │   └── logs/                  # Diretório de armazenamento de corridas em CSV
 ├── legacy/                    # [LEGADO] Versões históricas preservadas
@@ -90,13 +93,28 @@ Teste_car_0/
 * 📄 **[Especificação Funcional (FSD v4.0)](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/FSD.md)**
 * 📄 **[Diário de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/DIARIO_ENGENHARIA.md)**
 
+## 📄 Atualizações Recentes (16/11/2026)
+
+### Firmware
+- **Feedforward por velocidade:** o PID interpola a curva PWM×RPM medida em bancada (`diag_motor_curve`) e corrige por `CURVA_FATOR_CARGA = 0.80` (carga no solo). Substitui o feedforward fixo de 110 µs; `PID_KI = 1.5`.
+- **Pivô calibrado em solo:** antecipação `PIVO_ANTECIPACAO_GRAUS = 0.7°` (corte em 89,3°). Resultado: 90,29° ± 0,54°, contra 89,7–91,0° do ajuste anterior.
+- **Gravador de telemetria em RAM** (`telemetry_recorder.h`): 2000 amostras a 20 Hz (100 s), com dump por Serial (`d`) ou WebSocket (`dump`). Permite testar no solo sem cabo serial.
+- **Comandos remotos centralizados:** `start`/`stop`/`pause`/`reset`/`dump` em um único ponto do `loop()` — a flag `_newCommand` antes era consumida por blocos concorrentes e descartava comandos.
+- **Robustez:** timeout automático de 5 s desativado quando o Wi-Fi está conectado; estado final repetido gravado no máximo 1×/2 s para não descartar o teste do buffer circular.
+
+### Ferramentas PC
+- `robo_monitor/capturar_dump_wifi.py` — captura o dump do gravador via WebSocket, com reconexão automática.
+- `robo_monitor/capturar_dump.py` — captura via serial.
+- `robo_monitor/robo_ws_logger.py --replay dump.txt --saida out.csv` — converte o dump em CSV.
+- `diag_motor_curve/` com Wi-Fi: varredura não-bloqueante, buffer em RAM e página web (`sweep`/`csv`/`clear`).
+
 ## 📄 Atualizações Recentes (13/11/2026)
 
 ### Firmware
 - **Origem da odometria:** ponto inicial fixado em **(500 mm, 0)**.
 - **Ângulos de base específicos por lado:** cálculo de `baseDeg` agora depende do lado da roda, corrigindo a direção esperada.
 - **Correção de sinal da seta de orientação:** durante pivôs, a seta agora usa `curHeadingDeg = baseDeg - d.yaw` (antes `+`).
-- **Ganho de controle reforçado:** `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0` para reduzir desvio em retas; pivô com corte em 89,5° e roda calibrada em 66 mm.
+- **Ganho de controle reforçado:** `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0` para reduzir desvio em retas; pivô com antecipação calibrada (`PIVO_ANTECIPACAO_GRAUS = 0.7°`) e roda calibrada em 66 mm.
 - **Clamping de PWM ampliado:** agora ±50 µs (antes ±30 µs).
 
 ### Dashboard Web

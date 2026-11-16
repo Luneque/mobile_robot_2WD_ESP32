@@ -7,11 +7,17 @@ no terminal, além de salvar automaticamente em CSV.
 
 Uso:
     python robo_ws_logger.py [--host robo.local] [--port 81]
+    python robo_ws_logger.py --replay arquivo.txt [--saida out.csv]
 
 Exemplos:
     python robo_ws_logger.py
     python robo_ws_logger.py --host 192.168.1.42
     python robo_ws_logger.py --host robo.local --port 81
+    python robo_ws_logger.py --replay dump_serial.txt --saida teste_solo.csv
+
+O modo --replay converte um dump do gravador de telemetria (RAM) para CSV.
+O dump é capturado da serial com qualquer monitor (ex.: 'd' no Monitor Serial
+do Arduino IDE) e salvo como texto; cada linha válida começa com "REC,".
 
 Dependências:
     pip install -r requirements.txt
@@ -358,6 +364,44 @@ class RoboLogger:
 
 
 # -------------------------------------------------------------------------
+# Replay de dump do gravador de telemetria (RAM)
+# -------------------------------------------------------------------------
+CABECALHO_CSV = [
+    "timestamp_ms", "estado", "lado", "yaw_deg", "rpm_esq", "rpm_dir",
+    "ticks_esq", "ticks_dir", "ticks_alvo", "pwm_esq_us", "pwm_dir_us", "rpm_alvo",
+]
+
+
+def replay_dump(caminho_entrada: pathlib.Path, caminho_saida: pathlib.Path | None) -> int:
+    """
+    Converte um dump do gravador (linhas "REC,...") para CSV.
+    Retorna o número de amostras convertidas.
+    """
+    if caminho_saida is None:
+        caminho_saida = caminho_entrada.with_suffix(".csv")
+
+    amostras = []
+    with open(caminho_entrada, "r", encoding="utf-8", errors="replace") as f:
+        for linha in f:
+            linha = linha.strip()
+            if not linha.startswith("REC,"):
+                continue
+            partes = linha.split(",")
+            if len(partes) != 13:
+                continue
+            amostras.append(partes[1:])   # descarta o prefixo "REC"
+
+    with open(caminho_saida, "w", newline="", encoding="utf-8") as f:
+        escritor = csv.writer(f)
+        escritor.writerow(CABECALHO_CSV)
+        escritor.writerows(amostras)
+
+    print(f"[replay] {len(amostras)} amostras convertidas")
+    print(f"[replay] CSV: {caminho_saida}")
+    return len(amostras)
+
+
+# -------------------------------------------------------------------------
 # Ponto de entrada
 # -------------------------------------------------------------------------
 def main():
@@ -377,7 +421,27 @@ def main():
         default=81,
         help="Porta WebSocket do robô (padrão: 81)",
     )
+    parser.add_argument(
+        "--replay",
+        metavar="ARQUIVO",
+        help="Converte um dump do gravador (RAM) para CSV e encerra.",
+    )
+    parser.add_argument(
+        "--saida",
+        metavar="CSV",
+        help="Caminho do CSV de saída no modo --replay (padrão: mesmo nome do dump).",
+    )
     args = parser.parse_args()
+
+    # Modo replay: não precisa de dependências de rede
+    if args.replay:
+        entrada = pathlib.Path(args.replay)
+        if not entrada.exists():
+            print(f"[ERRO] Arquivo não encontrado: {entrada}")
+            sys.exit(1)
+        saida = pathlib.Path(args.saida) if args.saida else None
+        replay_dump(entrada, saida)
+        return
 
     # Verifica dependências antes de iniciar
     verificar_dependencias()

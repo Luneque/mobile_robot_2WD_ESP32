@@ -12,6 +12,14 @@ Desktop.ini
 # Backups e rascunhos
 *.tmp
 *.bak
+# Temporarios do agente Hermes
+.hermes-tmp.*
+
+# Dumps brutos de telemetria (replay) e logs do logger
+robo_monitor/dump_*.txt
+robo_monitor/dump_*.csv
+robo_monitor/logger_out.log
+robo_monitor/*.log
 
 
 # Credenciais Wi-Fi (nunca commitar!)

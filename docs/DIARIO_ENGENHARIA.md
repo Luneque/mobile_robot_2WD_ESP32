@@ -145,7 +145,51 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 12. Resumo da Estrutura Atual do Repositório
+### 12. Etapa 12: Feedforward por Velocidade, Gravador em RAM e Calibração no Solo (16/11/2026)
+
+* **Diagnóstico da Velocidade (curva PWM × RPM):**
+  * O motor não atingia os 55 RPM de cruzeiro, e o feedforward era um valor fixo de 110 µs — eficaz para romper o atrito estático, mas sem relação com a velocidade alvo.
+  * O utilitário `diag_motor_curve` levantou a curva real (robô suspenso). Duas medições divergiram bastante entre si (a primeira indicava ~90 RPM em 1850 µs; a segunda, ~116 RPM). A segunda foi adotada por ter sido obtida com o robô em condição estável.
+  * Conclusão: o hardware não era o limite. O motor entrega folga acima do alvo; o que faltava era o controle acertar o pulso.
+
+* **Feedforward Proporcional à Velocidade (`pid_controller.h`):**
+  * O PID passou a interpolar a curva PWM × RPM e corrigir por `CURVA_FATOR_CARGA` (a curva é medida sem carga; no solo o motor perde ~24% da velocidade).
+  * Evolução do fator: `0,75` → `0,80`, calibrado em solo contra o RPM real medido.
+  * `PID_KI` subiu de `0,6` para `1,5` quando se constatou que o teto do PID (1500 + 110 + 1,5·200 = 1730 µs) ficava abaixo dos ~1740 µs necessários sob carga.
+
+* **Calibração do Pivô (critério de corte):**
+  * O yaw registrado na telemetria **congela no instante do corte** (não inclui frenagem), o que permitiu calibrar a antecipação por comparação direta.
+  * A antecipação migrou de um literal `0,5f` para a macro `PIVO_ANTECIPACAO_GRAUS`, calibrada em `0,7°` (corte em 89,3°).
+  * Resultado em solo: **90,29° ± 0,54°** (amplitude 1,54°), contra 89,7–91,0° do ajuste anterior. Viés residual de +0,29°.
+
+* **Gravador de Telemetria em RAM (`telemetry_recorder.h`):**
+  * Como o robô não pode ficar com o cabo serial conectado durante o teste no solo, a telemetria passou a ser gravada em RAM (2000 amostras a 20 Hz, 100 s) e despejada depois por Serial (`d`) ou WebSocket (`dump`).
+  * Armadilhas encontradas: o buffer circular enchia de amostras repetidas de `CONCLUIDO` e descartava o teste (limitado a 1 amostra/2 s); o comando `dump` não ativava a flag `_newCommand`; o timeout automático de 5 s disparava com o Wi-Fi conectado e sobrescrevia o buffer (desativado quando há Wi-Fi).
+
+* **Correção de Concorrência nos Comandos Remotos:**
+  * A flag `_newCommand` era consumida por três blocos diferentes do `loop()`. O primeiro a rodar zerava a flag e os demais nunca viam o comando — o `start` remoto parecia ignorado.
+  * Solução: tratamento centralizado em um único ponto, com `switch` para `start`/`stop`/`pause`/`reset`/`dump`.
+
+* **Teste no Solo (resultados):**
+
+  | Métrica | Antes | Depois |
+  | :--- | :---: | :---: |
+  | Pico de RPM nas retas | 70,1 | 58,4 |
+  | PWM máximo | 1770 µs | 1744 µs |
+  | Tempo por reta | 3,45 s | 3,75 s |
+  | Yaw médio do pivô | +90,33° | +90,29° |
+  | Desvio padrão do pivô | 0,75° | 0,54° |
+  | Amplitude do pivô | 1,35° | 1,54° |
+  | Yaw final das retas | até +1,75° | −0,70° a +0,26° |
+  | Ticks por reta (alvo 10.417) | 10.443–10.488 | 10.446–10.516 |
+
+  * Nota de método: um primeiro teste com antecipação de 0,7° foi descartado porque o robô ainda não estava posicionado no solo; a repetição confirmou os números acima.
+
+* **Lição registrada:** a velocidade final (~58 RPM contra o alvo de 55) tem importância secundária. O que determina o fechamento da trajetória é a precisão angular dos pivôs (erro sistemático acumula; erro aleatório se dispersa) e a estabilidade de rumo nas retas.
+
+---
+
+### 13. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.
@@ -156,7 +200,16 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 * **`diag_pcnt/`:** Utilitário oficial de diagnóstico e validação dos encoders em hardware.
 * **`diag_i2c_bmi160/`:** Utilitário de diagnóstico I2C da IMU Bosch BMI160.
 * **`calib_imu_polaridade/`:** Ferramenta de validação da polaridade do eixo Z da IMU.
-* **`diag_motor_curve/`:** Utilitário de bancada que levanta a curva PWM × RPM dos motores, usado para decidir entre ajuste de PID e recalibração de ESC.
+* **`diag_motor_curve/`:** Utilitário de bancada que levanta a curva PWM × RPM dos motores (com Wi-Fi/WebSocket, buffer em RAM e página web), usado para decidir entre ajuste de PID e recalibração de ESC.
+* **`robo_monitor/`:** Ferramentas Python: `robo_ws_logger.py` (telemetria + `--replay` de dump para CSV), `capturar_dump.py` (dump via serial) e `capturar_dump_wifi.py` (dump via WebSocket, com reconexão).
+
+## 📄 Atualizações Recentes (16/11/2026)
+
+- **Feedforward por velocidade:** curva PWM×RPM medida em bancada, corrigida por `CURVA_FATOR_CARGA = 0.80`; `PID_KI = 1.5`. Pico em solo: 58,4 RPM.
+- **Pivô calibrado:** `PIVO_ANTECIPACAO_GRAUS = 0.7°` (corte 89,3°), resultado 90,29° ± 0,54°.
+- **Gravador em RAM:** 2000 amostras a 20 Hz com dump por Serial ou WebSocket — permite testar no solo sem cabo.
+- **Correção de concorrência:** comandos remotos centralizados (a flag `_newCommand` era consumida por blocos concorrentes).
+- **`diag_motor_curve` com Wi-Fi** e ferramentas de captura de dump em `robo_monitor/`.
 
 ## 📄 Atualizações Recentes (13/11/2026)
 
