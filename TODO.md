@@ -31,14 +31,14 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 
 ### [P1] Funcionalidades declaradas mas não implementadas
 
-1. ~~**ESP-NOW: lado do robô não existe.**~~ **ATENDIDO (16/11/2026, commit pendente).**
+1. ~~**ESP-NOW: lado do robô não existe.**~~ **ATENDIDO E VALIDADO (16/11/2026).**
    - Implementado em `espnow_link.h`: telemetria JSON ao gateway ESP32-S3 (5 Hz) e recepção de `start`/`stop`/`pause`/`reset`/`dump`.
    - Comandos aceitos por WebSocket **e** ESP-NOW, com dispatch centralizado; o dump é devolvido pelo canal que recebeu o pedido.
    - Adicionada a ponte `robo_monitor/gateway_espnow.py` (serial do gateway, grava CSV).
-   - Compatível com ESP-IDF v4/v5. Custo: +9,5 KB flash (1.051.735 bytes, 80%).
-   - **Restrição:** o gateway usa *broadcast* (`FF:FF:FF:FF:FF:FF`), não o MAC real do ESP32-S3. Funciona com qualquer gateway no canal, mas não é endereçamento dedicado. Para tráfego com MAC específico, preencher `ESPNOW_GATEWAY_MAC` com o MAC impresso no Serial do gateway.
-   - **Restrição de canal (medida em bancada):** o canal efetivo é o da interface Wi-Fi — com o robô associado a um AP, é o canal do AP (medido: **11**), não o `ESPNOW_CHANNEL`. Registrar o peer com canal 1 produzia `Peer channel is not equal to the home channel, send fail!` (39 erros/s). Correção aplicada: peer registrado com canal 0 (canal atual da interface). `esp_wifi_set_channel()` após o connect **derruba o Wi-Fi e trava o robô** — não usar.
-   - **Falta validar de ponta a ponta** com o ESP32-S3: o gateway está configurado para o canal 1 e o AP para o canal 11, então o enlace só fechará quando ambos coincidirem.
+   - **Validado de ponta a ponta** com gateway ESP32 clássico (COM18): robô→gateway 1472 pacotes/40 s; `CMD:start` confirmado e robô executou; dump devolvido com 443 amostras (RETA→CONCLUIDO). Números do dump idênticos aos do Wi-Fi (pico 58,8 RPM, pivôs 89,6–90,7°, desvio 0,40°).
+   - **Lição:** o gateway prefixa *todo* payload com `TELEM:`, inclusive o dump — as linhas chegam como `TELEM:REC,...`. Filtros por `startswith("REC,")` retornam 0. A ponte agora distingue os dois formatos.
+   - **Restrição:** gateway e robô precisam de canal coincidente. O canal do robô é o do AP (medido: 11); o gateway fixa o canal (`ESPNOW_CHANNEL`). O robô registra o peer com canal 0.
+   - **Armadilha:** `esp_wifi_set_channel()` após o connect Wi-Fi derruba o enlace e trava o `setup()` — não usar.
 
 2. **Monitor de bateria não implementado.**
    - `PIN_BATTERY_ADC = -1` (desabilitado) e nenhuma leitura de tensão no firmware.

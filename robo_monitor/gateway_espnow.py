@@ -148,14 +148,17 @@ class GatewayPonte:
 
     def _processar_telem(self, payload: str):
         import json
+        # O gateway prefixa TODO payload com "TELEM:", inclusive as linhas do
+        # dump do gravador ("REC,..."). Trata os dois formatos.
+        if payload.startswith("REC,"):
+            print(f"  {payload}")
+            return
         try:
             dados = json.loads(payload)
         except json.JSONDecodeError:
             print(f"[aviso] TELEM inválido: {payload[:80]}")
             return
         self._gravar_csv(dados)
-        if "REC," in payload:
-            print(f"  {payload}")
 
 
 def main():

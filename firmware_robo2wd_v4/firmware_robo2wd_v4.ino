@@ -49,6 +49,9 @@ static uint32_t _dumpUltimoEnvio = 0;
 static char     _dumpLinha[96];
 #define DUMP_WS_INTERVAL_MS 50
 #define DUMP_WS_POR_LOTE    10
+// ESP-NOW: lote menor e intervalo maior (rajadas descartam pacotes no gateway)
+#define DUMP_ESPNOW_INTERVAL_MS 100
+#define DUMP_ESPNOW_POR_LOTE    1
 
 uint32_t g_lastPwm1 = ESC_NEUTRO_US;
 uint32_t g_lastPwm2 = ESC_NEUTRO_US;
@@ -595,21 +598,24 @@ void loop() {
         wirelessTelem.sendRaw("[REC] Dump concluido.");
     }
 
-    // Envio incremental do dump via ESP-NOW (o gateway reencaminha ao PC)
+    // Envio incremental do dump via ESP-NOW (o gateway reencaminha ao PC).
+    // Lote pequeno e intervalo maior: rajadas de ESP-NOW descartam pacotes no
+    // gateway (ele trata o payload como telemetria e imprime, mas o excesso
+    // transborda o buffer de recepção).
     if (_dumpParaEspNow && _dumpIdx < _dumpTotal) {
-        if (now - _dumpUltimoEnvio >= DUMP_WS_INTERVAL_MS) {
-            _dumpUltimoEnvio = now;
-            uint16_t fim = (uint16_t)min((uint16_t)(_dumpIdx + DUMP_WS_POR_LOTE), _dumpTotal);
-            for (uint16_t i = _dumpIdx; i < fim; i++) {
-                recorder.dumpSample(i, _dumpLinha, sizeof(_dumpLinha));
-                espnow.sendTelemetry(_dumpLinha);
+            if (now - _dumpUltimoEnvio >= DUMP_ESPNOW_INTERVAL_MS) {
+                _dumpUltimoEnvio = now;
+                uint16_t fim = (uint16_t)min((uint16_t)(_dumpIdx + DUMP_ESPNOW_POR_LOTE), _dumpTotal);
+                for (uint16_t i = _dumpIdx; i < fim; i++) {
+                    recorder.dumpSample(i, _dumpLinha, sizeof(_dumpLinha));
+                    espnow.sendTelemetry(_dumpLinha);
+                }
+                _dumpIdx = fim;
             }
-            _dumpIdx = fim;
+        } else if (_dumpParaEspNow && _dumpIdx >= _dumpTotal) {
+            _dumpParaEspNow = false;
+            espnow.sendTelemetry("[REC] Dump concluido.");
         }
-    } else if (_dumpParaEspNow && _dumpIdx >= _dumpTotal) {
-        _dumpParaEspNow = false;
-        espnow.sendTelemetry("[REC] Dump concluido.");
-    }
 
     // Tratamento centralizado dos comandos de texto (start/stop/pause/reset/dump).
     // Um UNICO ponto de consumo de cada flag: se dois blocos chamarem

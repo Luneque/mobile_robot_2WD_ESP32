@@ -104,12 +104,17 @@ void setup() {
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();  // Garante que não está tentando conectar a nada
 
-    // Força o canal Wi-Fi para o canal 1 (deve coincidir com o robô)
+    // O canal Wi-Fi do enlace. Tem que coincidir com o canal da interface do
+    // robô (que, associado ao AP, é o canal do AP).
     esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
 
-    // Imprime o próprio MAC (usuário deve anotar e configurar no robô)
-    Serial.printf("MAC: %s\n", WiFi.macAddress().c_str());
-    Serial.printf("DBG:Canal ESP-NOW: %d\n", ESPNOW_CHANNEL);
+    // Obtém o MAC DEPOIS do modo Wi-Fi estar ativo; antes disso o driver
+    // retorna 00:00:00:00:00:00.
+    uint8_t mac[6] = {0};
+    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    Serial.printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+                  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    Serial.printf("DBG:Canal ESP-NOW: %d\r\n", ESPNOW_CHANNEL);
 
     // Inicializa ESP-NOW
     if (esp_now_init() != ESP_OK) {

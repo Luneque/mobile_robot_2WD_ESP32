@@ -201,6 +201,18 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 * **Custo:** +9,5 KB de flash (1.051.735 bytes, 80%); RAM inalterada em 116.808 bytes (35%).
 * **Pendência de validação:** o enlace ainda não foi testado de ponta a ponta com o hardware do gateway (há apenas um ESP32 disponível; o ESP32-S3 não estava conectado).
 
+* **Resultado da validação ponta a ponta (16/11/2026, gateway ESP32 clássico em COM18):**
+
+  | Direção | Resultado |
+  | :--- | :--- |
+  | Robô → gateway (telemetria) | 1.472 pacotes em 40 s (5 Hz) |
+  | PC → robô (`CMD:start`) | Confirmado; robô executou `RETA → PIVO → RETA` |
+  | Dump do gravador → PC | 443 amostras, de `RETA` a `CONCLUIDO` |
+
+  * Números do dump via ESP-NOW idênticos aos do Wi-Fi: pico 58,8 RPM, pivôs 89,6°–90,7° (média 90,12°, desvio 0,40°), yaw das retas −1,00° a +0,37°, ticks 10.449–10.505.
+  * **Lição de depuração:** o gateway prefixa *todo* payload com `TELEM:`, inclusive o dump — as linhas chegam como `TELEM:REC,...`. Um filtro por `startswith("REC,")` retorna zero e faz parecer que o dump falhou. A ponte `gateway_espnow.py` agora distingue JSON de telemetria de linha `REC,`.
+  * **Ajustes da validação:** o gateway passa a imprimir o MAC real via `esp_wifi_get_mac()` depois do modo Wi-Fi (antes saía `00:00:00:00:00:00`); o lote do dump por ESP-NOW caiu para 1 pacote/100 ms (rajadas descartam pacotes).
+
 ---
 
 ### 14. Resumo da Estrutura Atual do Repositório
