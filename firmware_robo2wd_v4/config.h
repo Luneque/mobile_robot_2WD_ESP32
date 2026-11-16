@@ -126,8 +126,19 @@
 // ==========================================
 // 8. ESP-NOW (Gateway ESP32-S3 Super Mini)
 // ==========================================
-// MAC do gateway ESP32-S3 (preencher após gravar gateway_espnow.ino e ler o MAC impresso no Serial)
-// Enquanto não configurado, o envio ESP-NOW fica desabilitado.
-#define ESPNOW_GATEWAY_MAC      {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}  // Broadcast (padrão)
+// Canal Wi-Fi do enlace ESP-NOW. ATENCAO: o canal efetivo e' o da interface
+// Wi-Fi. O gateway fica SEM AP e fixa este canal, mas o robô, associado ao AP,
+// opera no canal do AP (medido: 11). Para o enlace fechar, os dois precisam
+// coincidir: ajuste este valor para o canal do AP, ou configure o AP para este
+// canal. Registrar o peer com canal fixo divergente gera
+// "Peer channel is not equal to the home channel, send fail!".
+#define ESPNOW_CHANNEL          1
+// MAC do gateway ESP32-S3 (preencher apos gravar gateway_espnow.ino e ler o MAC
+// impresso no Serial). Broadcast = envia para qualquer gateway no canal.
+#define ESPNOW_GATEWAY_MAC      {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
+// Telemetria ESP-NOW em Hz (redundancia/alternativa ao Wi-Fi).
+#define ESPNOW_TELEM_HZ         5
+// Timeout sem receber do gateway: apos este periodo o robo reporta falha de enlace.
+#define ESPNOW_LINK_TIMEOUT_MS  3000
 
 #endif // CONFIG_H

@@ -31,7 +31,13 @@
 // Configurações
 // -------------------------------------------------------------------------
 #define SERIAL_BAUD       115200
-#define ESPNOW_CHANNEL    1          // Canal Wi-Fi para ESP-NOW (1–13)
+// Canal Wi-Fi do enlace ESP-NOW (1-13).
+// DEVE coincidir com o canal da interface do robô. Como o robô fica associado
+// ao AP, o canal efetivo dele é o do AP. Se o canal divergir, o envio falha com
+// "Peer channel is not equal to the home channel, send fail!".
+// Ajuste para o canal do seu AP (o firmware do robô imprime o canal real no boot,
+// na linha "[ESPNOW] Canal atual da interface: N").
+#define ESPNOW_CHANNEL    11
 #define MAX_PAYLOAD       250        // Limite ESP-NOW em bytes
 
 // MAC broadcast — envia para todos os dispositivos ESP-NOW na rede
@@ -69,8 +75,14 @@ void OnDataRecv(const uint8_t* mac_addr, const uint8_t* data, int len) {
 
 // -------------------------------------------------------------------------
 // Callback: confirmação de envio ESP-NOW (gateway -> robô)
+// A assinatura mudou no ESP-IDF v5 (core 3.x): de (mac, status) para
+// (tx_info, status).
 // -------------------------------------------------------------------------
+#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
+void OnDataSent(const wifi_tx_info_t* tx_info, esp_now_send_status_t status) {
+#else
 void OnDataSent(const uint8_t* mac_addr, esp_now_send_status_t status) {
+#endif
     if (status == ESP_NOW_SEND_SUCCESS) {
         Serial.println("DBG:CMD enviado com sucesso");
     } else {

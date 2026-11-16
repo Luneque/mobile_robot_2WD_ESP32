@@ -37,10 +37,10 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
   - Dashboard Web embarcado em PROGMEM com gráficos em tempo real e exportação CSV.
   - Partida remota via WebSocket (botão START no navegador).
   - Compensação por feedforward proporcional à velocidade, a partir da curva PWM×RPM medida em bancada e corrigida pelo fator de carga do robô no solo (substitui o feedforward fixo de 110 µs).
-  - Firmware de gateway para ESP32-S3 Super Mini (gateway_espnow/).
+  - Firmware de gateway para ESP32-S3 Super Mini (`gateway_espnow/`).
+  - Envio direto por ESP-NOW no robô (`espnow_link.h`), como redundância/alternativa ao Wi-Fi.
 - **Fora do Escopo Atual (Versões Futuras):**
   - Navegação autônoma em mapa dinâmico (SLAM), LiDAR e desvio de obstáculos.
-  - Envio direto por ESP-NOW no robô (planejado para v4.1 como redundância ao Wi-Fi).
 
 ---
 
@@ -170,7 +170,10 @@ stateDiagram-v2
 - **Comandos remotos centralizados:** `start`/`stop`/`pause`/`reset`/`dump` tratados em um único ponto do `loop()` (antes a flag `_newCommand` era consumida por blocos concorrentes, descartando comandos).
 - **`diag_motor_curve` com Wi-Fi:** varredura não-bloqueante, buffer em RAM, página web e comandos `sweep`/`csv`/`clear`.
 - **Robustez:** timeout automático de 5 s desativado quando o Wi-Fi está conectado (o início passa a ser exclusivamente remoto).
-- **Ferramentas (`robo_monitor/`):** `capturar_dump.py` (serial), `capturar_dump_wifi.py` (WebSocket, com reconexão) e modo `--replay` no `robo_ws_logger.py` para converter o dump em CSV.
+- **Ferramentas (`robo_monitor/`):** `capturar_dump.py` (serial), `capturar_dump_wifi.py` (WebSocket, com reconexão), modo `--replay` no `robo_ws_logger.py` para converter o dump em CSV, e `gateway_espnow.py` (ponte serial do gateway ESP32-S3, aceita `start`/`stop`/`pause`/`reset`/`dump` e grava CSV).
+- **ESP-NOW implementado no robô (`espnow_link.h`):** telemetria JSON ao gateway ESP32-S3 (5 Hz) e recepção de `start`/`stop`/`pause`/`reset`/`dump`. Compatível com ESP-IDF v4 e v5 (a assinatura do callback de envio mudou no core 3.x). O dump é devolvido pelo canal que recebeu o pedido.
+- **Restrição de canal confirmada em bancada:** o canal efetivo do enlace é o da interface Wi-Fi — com o robô associado a um AP, é o canal do AP (medido: 11). Registrar o peer com canal 1 nesse cenário produzia `Peer channel is not equal to the home channel, send fail!`. O peer agora nasce com canal 0 (canal atual). **Para enlace dedicado, o AP deve operar no canal configurado em `ESPNOW_CHANNEL`** (ou o gateway deve usar o mesmo canal do AP). Com `esp_wifi_set_channel()` após o connect, o robô derruba o Wi-Fi e trava — não usar.
+- **Validação:** boot íntegro, HTTP 80 e WebSocket 81 respondendo, zero erros de envio no log. **Ainda falta validar o enlace de ponta a ponta com o ESP32-S3.**
 
 ## 📄 Atualizações Recentes (13/11/2026)
 

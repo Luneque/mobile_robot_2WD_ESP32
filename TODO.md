@@ -31,11 +31,14 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 
 ### [P1] Funcionalidades declaradas mas não implementadas
 
-1. **ESP-NOW: lado do robô não existe.**
-   - `gateway_espnow/gateway_espnow.ino` implementa só o gateway (recebe `TELEM:{json}` do robô e envia `CMD:` para ele).
-   - O firmware do robô tem **zero** referências a `esp_now` (verificado: 0 ocorrências em `*.ino`/`*.h`).
-   - Mas a FSD (seção 2.3) lista "Firmware de gateway para ESP32-S3" como **dentro do escopo**, e o cabeçalho da FSD anuncia "ESP-NOW Gateway" como parte da versão oficial.
-   - Ou o robô ganha o lado ESP-NOW, ou a FSD deve reclassificar isso como fora de escopo (hoje já há uma linha dizendo "planejado para v4.1", em contradição com a seção 2.3).
+1. ~~**ESP-NOW: lado do robô não existe.**~~ **ATENDIDO (16/11/2026, commit pendente).**
+   - Implementado em `espnow_link.h`: telemetria JSON ao gateway ESP32-S3 (5 Hz) e recepção de `start`/`stop`/`pause`/`reset`/`dump`.
+   - Comandos aceitos por WebSocket **e** ESP-NOW, com dispatch centralizado; o dump é devolvido pelo canal que recebeu o pedido.
+   - Adicionada a ponte `robo_monitor/gateway_espnow.py` (serial do gateway, grava CSV).
+   - Compatível com ESP-IDF v4/v5. Custo: +9,5 KB flash (1.051.735 bytes, 80%).
+   - **Restrição:** o gateway usa *broadcast* (`FF:FF:FF:FF:FF:FF`), não o MAC real do ESP32-S3. Funciona com qualquer gateway no canal, mas não é endereçamento dedicado. Para tráfego com MAC específico, preencher `ESPNOW_GATEWAY_MAC` com o MAC impresso no Serial do gateway.
+   - **Restrição de canal (medida em bancada):** o canal efetivo é o da interface Wi-Fi — com o robô associado a um AP, é o canal do AP (medido: **11**), não o `ESPNOW_CHANNEL`. Registrar o peer com canal 1 produzia `Peer channel is not equal to the home channel, send fail!` (39 erros/s). Correção aplicada: peer registrado com canal 0 (canal atual da interface). `esp_wifi_set_channel()` após o connect **derruba o Wi-Fi e trava o robô** — não usar.
+   - **Falta validar de ponta a ponta** com o ESP32-S3: o gateway está configurado para o canal 1 e o AP para o canal 11, então o enlace só fechará quando ambos coincidirem.
 
 2. **Monitor de bateria não implementado.**
    - `PIN_BATTERY_ADC = -1` (desabilitado) e nenhuma leitura de tensão no firmware.
@@ -123,7 +126,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 
 ## 4. Sugestão de Ordem de Trabalho
 
-1. **[P1]** Decidir o destino do ESP-NOW: implementar o lado do robô ou reclassificar na FSD como fora de escopo (a contradição atual é o problema).
+1. ~~**[P1]** Decidir o destino do ESP-NOW~~ — **atendido**: implementado o lado do robô (`espnow_link.h`) + ponte `gateway_espnow.py`. Resta validar com o ESP32-S3 e, se desejado, trocar broadcast por MAC dedicado.
 2. **[P1]** Monitor de bateria (hardware + `PIN_BATTERY_ADC` + alerta/telemetria).
 3. **[P2]** Chart.js local (baixar o arquivo para PROGMEM ou servir do SPIFFS).
 4. **[P2]** Mapa 2D com orientação real medida (remover `baseDeg` nominal).

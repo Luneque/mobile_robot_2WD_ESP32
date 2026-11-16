@@ -7,6 +7,7 @@
 #include "esp_task_wdt.h"
 #include "wifi_telemetry.h"
 #include "telemetry_recorder.h"
+#include "espnow_link.h"
 #include "secrets.h"
 
 // =========================================================================
@@ -29,11 +30,19 @@ WifiTelemetry wirelessTelem;
 bool g_wifiOk = false;
 uint32_t g_lastTelemTime = 0;
 
+// Enlace ESP-NOW com o gateway ESP32-S3 (redundancia/alternativa ao Wi-Fi)
+EspNowLink espnow;
+bool g_espnowOk = false;
+uint32_t g_lastEspnowTelem = 0;
+uint32_t g_lastEspnowRx = 0;   // ultimo recebimento do gateway (watchdog de enlace)
+
 // Gravador de telemetria em RAM (para testes sem cabo serial, ex.: robô no solo)
 TelemetryRecorder recorder;
 
-// Dump incremental via WebSocket (robô sem cabo)
+// Dump incremental via WebSocket / ESP-NOW (robô sem cabo)
 static bool     _dumpParaWs = false;
+static bool     _dumpParaEspNow = false;
+static bool     _dumpCanalEspNow = false;
 static uint16_t _dumpIdx = 0;
 static uint16_t _dumpTotal = 0;
 static uint32_t _dumpUltimoEnvio = 0;
@@ -362,6 +371,41 @@ void enviarTelemetria(uint32_t now) {
 }
 
 // =========================================================================
+// TELEMETRIA ESP-NOW (redundancia/alternativa ao Wi-Fi)
+// =========================================================================
+// Serializa o mesmo pacote em JSON e envia ao gateway ESP32-S3.
+void enviarTelemEspNow(uint32_t now) {
+    if (!g_espnowOk) return;
+    if (now - g_lastEspnowTelem < (1000 / ESPNOW_TELEM_HZ)) return;
+    g_lastEspnowTelem = now;
+
+    float rpm1 = encoders.getRPM1();
+    float rpm2 = encoders.getRPM2();
+    int32_t t1  = abs(encoders.getTicksM1());
+    int32_t t2  = abs(encoders.getTicksM2());
+    float yaw   = imu.isInitialized() ? imu.getYawAngleDeg() : 0.0f;
+
+    const char* estadoStr = "AGUARDO";
+    if (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA) estadoStr = g_emLinhaReta ? "RETA" : "PIVO";
+    else if (estadoAtual == ESTADO_CONCLUIDO)   estadoStr = "CONCLUIDO";
+    else if (estadoAtual == ESTADO_EMERGENCIA)  estadoStr = "EMERGENCIA";
+    else if (estadoAtual == ESTADO_FALHA_HARDWARE) estadoStr = "FALHA";
+    else if (estadoAtual == ESTADO_ARMANDO_ESC) estadoStr = "ARMANDO";
+
+    char buf[200];
+    int n = snprintf(buf, sizeof(buf),
+        "{\"ts\":%lu,\"st\":\"%s\",\"sd\":%d,\"of\":%d,\"yaw\":%.2f,"
+        "\"r1\":%.1f,\"r2\":%.1f,\"t1\":%ld,\"t2\":%ld,\"tg\":%ld,"
+        "\"w1\":%u,\"w2\":%u,\"rt\":%.1f}",
+        (unsigned long)now, estadoStr, g_ladoAtual, QUADRADO_LADOS, yaw,
+        rpm1, rpm2, (long)t1, (long)t2, (long)g_targetTicks,
+        (unsigned)g_lastPwm1, (unsigned)g_lastPwm2,
+        g_emLinhaReta ? VELOCIDADE_CRUZEIRO_RPM : VELOCIDADE_GIRO_RPM);
+
+    if (n > 0 && n < (int)sizeof(buf)) espnow.sendTelemetry(buf);
+}
+
+// =========================================================================
 // GRAVADOR DE TELEMETRIA EM RAM (replay para testes sem cabo serial)
 // =========================================================================
 uint8_t codigoEstadoRecorder() {
@@ -447,7 +491,7 @@ void setup() {
     if (g_wifiOk) {
         Serial.printf("[OK] Wi-Fi conectado! IP: %s | Dashboard: http://robo.local/\n", wirelessTelem.getIP().c_str());
     } else {
-        Serial.println("[AVISO] Wi-Fi nao conectou. Operando sem telemetria sem fio.");
+        Serial.println(F("[AVISO] Wi-Fi nao conectou. Operando sem telemetria sem fio."));
     }
 
     // 4. Procedimento de Armamento do ESC (antes de subscrever a task no WDT)
@@ -489,6 +533,18 @@ void setup() {
     Serial.printf("[REC] Gravador de telemetria ativo: %d amostras a %d Hz (max %.0f s).\n",
                   REC_MAX_SAMPLES, 1000 / REC_INTERVAL_MS, (float)REC_MAX_SAMPLES * REC_INTERVAL_MS / 1000.0f);
     Serial.println(F("[REC] Envie 'd' (serial) ou 'dump' (WebSocket) para despejar o buffer em CSV."));
+
+    // 7. Enlace ESP-NOW: o init e o registro do peer são feitos DEPOIS da
+    //    conexão Wi-Fi, porque o peer precisa nascer com o canal atual da
+    //    interface (registrá-lo antes usa um canal que o connect sobrescreve).
+    g_espnowOk = espnow.begin();
+    if (g_espnowOk) {
+        espnow.fixChannel();
+        espnow.addPeerAfterChannel();
+    } else {
+        Serial.println(F("[AVISO] ESP-NOW indisponivel. Operando apenas com Wi-Fi."));
+    }
+    g_lastEspnowRx = millis();
 }
 
 // =========================================================================
@@ -510,6 +566,7 @@ void loop() {
     // Envio periódico de telemetria sem fio (5 Hz)
     if (estadoAtual != ESTADO_FALHA_HARDWARE) {
         enviarTelemetria(now);
+        enviarTelemEspNow(now);
         gravarAmostraRecorder(now);
     }
 
@@ -538,57 +595,88 @@ void loop() {
         wirelessTelem.sendRaw("[REC] Dump concluido.");
     }
 
-    // Tratamento centralizado dos comandos de texto (start/stop/pause/reset/dump).
-    // Um UNICO ponto de consumo da flag: se dois blocos chamarem hasNewCommand(),
-    // o primeiro zera a flag e o segundo nunca vê o comando.
-    char cmdWs = '\0';
-    if (g_wifiOk && wirelessTelem.hasNewCommand()) {
-        cmdWs = wirelessTelem.getLastCommand();
-        Serial.print(F("[LOOP] comando WS: "));
-        Serial.println(cmdWs);
+    // Envio incremental do dump via ESP-NOW (o gateway reencaminha ao PC)
+    if (_dumpParaEspNow && _dumpIdx < _dumpTotal) {
+        if (now - _dumpUltimoEnvio >= DUMP_WS_INTERVAL_MS) {
+            _dumpUltimoEnvio = now;
+            uint16_t fim = (uint16_t)min((uint16_t)(_dumpIdx + DUMP_WS_POR_LOTE), _dumpTotal);
+            for (uint16_t i = _dumpIdx; i < fim; i++) {
+                recorder.dumpSample(i, _dumpLinha, sizeof(_dumpLinha));
+                espnow.sendTelemetry(_dumpLinha);
+            }
+            _dumpIdx = fim;
+        }
+    } else if (_dumpParaEspNow && _dumpIdx >= _dumpTotal) {
+        _dumpParaEspNow = false;
+        espnow.sendTelemetry("[REC] Dump concluido.");
     }
 
-    if (cmdWs != '\0') {
-        switch (cmdWs) {
-            case 's':  // start
-                if (estadoAtual == ESTADO_AGUARDO_INICIO || estadoAtual == ESTADO_CONCLUIDO) {
-                    Serial.println("\n>>> COMANDO RECEBIDO! INICIANDO TRAJETÓRIA DO QUADRADO <<<");
-                    recorder.clear();
-                    g_ladoAtual = 1;
-                    subEstado = SUB_INICIAR_SEGMENTO;
-                    g_emLinhaReta = true;
-                    estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
-                }
-                break;
+    // Tratamento centralizado dos comandos de texto (start/stop/pause/reset/dump).
+    // Um UNICO ponto de consumo de cada flag: se dois blocos chamarem
+    // hasNewCommand()/hasCommand(), o primeiro zera a flag e o segundo nunca vê
+    // o comando. Dispatch central (um switch no topo do loop()).
+    String cmdTxt;
+    bool _comandoVeioPorEspNow = false;
+    if (g_wifiOk && wirelessTelem.hasNewCommand()) {
+        char c = wirelessTelem.getLastCommand();
+        Serial.print(F("[LOOP] comando WS: "));
+        Serial.println(c);
+        _comandoVeioPorEspNow = false;
+        switch (c) {
+            case 's': cmdTxt = "start"; break;
+            case 'x': cmdTxt = "stop";  break;
+            case 'p': cmdTxt = "pause"; break;
+            case 'r': cmdTxt = "reset"; break;
+            case 'd': cmdTxt = "dump";  break;
+            default: break;
+        }
+    }
+    if (g_espnowOk && espnow.hasCommand()) {
+        const char* e = espnow.getLastCommand();
+        g_lastEspnowRx = now;   // enlace vivo
+        Serial.print(F("[LOOP] comando ESP-NOW: "));
+        Serial.println(e);
+        if (cmdTxt.isEmpty()) {
+            cmdTxt = String(e);
+            _comandoVeioPorEspNow = true;
+        }
+    }
 
-            case 'd':  // dump do gravador via WebSocket
-                _dumpParaWs = true;
-                _dumpIdx = 0;
-                _dumpTotal = recorder.count();
-                Serial.println(F("[REC] Dump remoto via WebSocket solicitado."));
-                break;
-
-            case 'x':  // stop
-            case 'p':  // pause
-                if (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA) {
-                    motors.stopAll();
-                    g_lastPwm1 = ESC_NEUTRO_US;
-                    g_lastPwm2 = ESC_NEUTRO_US;
-                    estadoAtual = ESTADO_CONCLUIDO;
-                    Serial.println("\n[PARADA REMOTA] Trajetoria interrompida via WebSocket!");
-                }
-                break;
-
-            case 'r':  // reset
+    if (!cmdTxt.isEmpty()) {
+        if (cmdTxt == "start") {
+            if (estadoAtual == ESTADO_AGUARDO_INICIO || estadoAtual == ESTADO_CONCLUIDO) {
+                Serial.println("\n>>> COMANDO RECEBIDO! INICIANDO TRAJETÓRIA DO QUADRADO <<<");
                 recorder.clear();
                 g_ladoAtual = 1;
-                g_emLinhaReta = true;
                 subEstado = SUB_INICIAR_SEGMENTO;
+                g_emLinhaReta = true;
                 estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
-                break;
-
-            default:
-                break;
+            }
+        } else if (cmdTxt == "dump") {
+            _dumpIdx = 0;
+            _dumpTotal = recorder.count();
+            _dumpCanalEspNow = _comandoVeioPorEspNow;
+            if (_dumpCanalEspNow) {
+                _dumpParaEspNow = true;
+                Serial.println(F("[REC] Dump remoto via ESP-NOW solicitado."));
+            } else {
+                _dumpParaWs = true;
+                Serial.println(F("[REC] Dump remoto via WebSocket solicitado."));
+            }
+        } else if (cmdTxt == "stop" || cmdTxt == "pause") {
+            if (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA) {
+                motors.stopAll();
+                g_lastPwm1 = ESC_NEUTRO_US;
+                g_lastPwm2 = ESC_NEUTRO_US;
+                estadoAtual = ESTADO_CONCLUIDO;
+                Serial.println("\n[PARADA REMOTA] Trajetoria interrompida!");
+            }
+        } else if (cmdTxt == "reset") {
+            recorder.clear();
+            g_ladoAtual = 1;
+            g_emLinhaReta = true;
+            subEstado = SUB_INICIAR_SEGMENTO;
+            estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
         }
     }
 

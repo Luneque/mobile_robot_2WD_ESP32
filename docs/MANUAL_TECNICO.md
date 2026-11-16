@@ -93,7 +93,9 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 * **[`motor_control_mcpwm.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/motor_control_mcpwm.h):** Gerador determinístico de PWM a 50 Hz com resolução de $1\,\mu\text{s}$ via timer de 1 MHz.
 * **[`encoder_reader_pcnt.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/encoder_reader_pcnt.h):** Decodificador de pulsos com filtro anti-glitch de 1000 ns e filtro exponencial de velocidade (EMA).
 * **[`pid_controller.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/pid_controller.h):** Controlador PID com anti-windup e feedforward proporcional à velocidade, obtido por interpolação da curva PWM×RPM medida em bancada (`diag_motor_curve`) e corrigido pelo fator de carga (`CURVA_FATOR_CARGA`).
-* **[`firmware_robo2wd_v4.ino`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/firmware_robo2wd_v4.ino):** Máquina de estados não-bloqueante (`ESTADO_AGUARDO_INICIO`, `ESTADO_EXECUTANDO_TRAJETORIA`, `ESTADO_CONCLUIDO`, `ESTADO_EMERGENCIA`), perfil trapezoidal e fusão sensorial IMU + Encoders.
+* **`telemetry_recorder.h`:** Gravador de telemetria em RAM (2000 amostras a 20 Hz, 100 s), com dump por Serial (`d`) ou via WebSocket/ESP-NOW (`dump`). Permite testar o robô no solo sem cabo.
+* **`espnow_link.h`:** Enlace ESP-NOW com o gateway ESP32-S3. Envia a telemetria em JSON (5 Hz) e recebe comandos de texto. Compatível com ESP-IDF v4 e v5. O dump do gravador é devolvido pelo canal que recebeu o pedido.
+* **`firmware_robo2wd_v4.ino`:** Máquina de estados não-bloqueante (`ESTADO_AGUARDO_INICIO`, `ESTADO_EXECUTANDO_TRAJETORIA`, `ESTADO_CONCLUIDO`, `ESTADO_EMERGENCIA`), perfil trapezoidal, fusão sensorial IMU + Encoders e dispatch centralizado de comandos.
 
 ### 4.2 Dinâmica do Perfil Trapezoidal
 * **Reta (500 mm):**
@@ -123,7 +125,36 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 
 ### 5.2 Operação Local via Cabo Serial (Fallback de Bancada)
 1. Conecte o robô via USB (`COM9`) e abra o monitor serial em **115200 baud**.
-2. O robô aceita o envio de **`s`** ou **`g`** pela serial para início manual (ou aguarda 5s para timeout).
+2. O robô aceita o envio de **`s`** ou **`g`** pela serial para início manual.
+   * O *timeout* automático de 5 s só dispara quando o Wi-Fi **não** está conectado; com Wi-Fi ativo, o início é remoto.
+
+### 5.3 Gravação e Leitura de Telemetria em Solo (sem cabo)
+O robô grava telemetria em RAM a 20 Hz (2000 amostras, 100 s) — ideal para teste no solo, onde o cabo não pode ficar conectado.
+
+1. **Iniciar a trajetória:** botão **START** no dashboard, ou `start` via WebSocket/ESP-NOW.
+2. **Despejar o buffer:** envie `dump` pelo dashboard, por um dos scripts abaixo, ou `d` na serial.
+3. **Capturar (robô sem cabo, via Wi-Fi):**
+   ```
+   python robo_monitor/capturar_dump_wifi.py --host robo.local --start --espera 45 --saida dump.txt
+   ```
+4. **Capturar (robô com cabo):**
+   ```
+   python robo_monitor/capturar_dump.py --port COM9 --start --espera 45 --saida dump.txt
+   ```
+5. **Converter o dump em CSV:**
+   ```
+   python robo_monitor/robo_ws_logger.py --replay dump.txt --saida teste.csv
+   ```
+6. **Atenção:** o buffer é volátil — o dump deve ser feito **antes** de desligar/reiniciar o robô.
+
+### 5.4 Operação via ESP-NOW (Gateway ESP32-S3)
+1. Grave `gateway_espnow/gateway_espnow.ino` no ESP32-S3 e anote o MAC impresso no Serial.
+2. Ajuste `ESPNOW_CHANNEL` em `config.h` do robô para o mesmo canal do gateway.
+3. Conecte o gateway ao PC e execute a ponte:
+   ```
+   python robo_monitor/gateway_espnow.py --port COM9 --csv telemetria_espnow.csv
+   ```
+4. No prompt da ponte, envie `start`, `stop`, `pause`, `reset` ou `dump`. A telemetria chega em `TELEM:{json}` e é gravada em CSV.
 
 ---
 

@@ -1,5 +1,6 @@
-# Dependências do robo_ws_logger.py
+# Dependências do logger de telemetria e das ferramentas de captura
 # Instale com: pip install -r requirements.txt
 
 websockets>=12.0
 rich>=13.0
+pyserial>=3.5

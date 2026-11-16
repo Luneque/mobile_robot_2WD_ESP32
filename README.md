@@ -52,7 +52,8 @@ Teste_car_0/
 │   ├── robo_ws_logger.py      # Logger WebSocket assíncrono para terminal e CSV (+ --replay)
 │   ├── capturar_dump.py       # Captura o dump do gravador em RAM via serial
 │   ├── capturar_dump_wifi.py  # Captura o dump do gravador em RAM via WebSocket
-│   ├── requirements.txt       # Dependências Python (websockets, rich)
+│   ├── gateway_espnow.py      # Ponte serial do gateway ESP32-S3 (ESP-NOW <-> PC)
+│   ├── requirements.txt       # Dependências Python (websockets, rich, pyserial)
 │   └── logs/                  # Diretório de armazenamento de corridas em CSV
 ├── legacy/                    # [LEGADO] Versões históricas preservadas
 │   ├── firmware_robo2wd/      # Versão 1: LEDC + Interrupções de software (ISRs)
@@ -66,6 +67,7 @@ Teste_car_0/
 └── docs/                      # Documentação técnica e de engenharia
     ├── FSD.md                 # Especificação Funcional Definitiva (v4.0.0 em PT-BR)
     ├── MANUAL_TECNICO.md      # Manual completo de pinagem, cinemática, operação e compilação
+    ├── ROTEIRO_ESPNOW.md      # Validação da ponte robô <-> gateway ESP32-S3
     └── DIARIO_ENGENHARIA.md   # Registro cronológico detalhado da evolução do projeto
 ```
 
@@ -91,6 +93,7 @@ Teste_car_0/
 
 * 📄 **[Manual Técnico e de Operação](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/MANUAL_TECNICO.md)**
 * 📄 **[Especificação Funcional (FSD v4.0)](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/FSD.md)**
+* 📄 **[Roteiro de Validação do Enlace ESP-NOW](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/ROTEIRO_ESPNOW.md)**
 * 📄 **[Diário de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/DIARIO_ENGENHARIA.md)**
 
 ## 📄 Atualizações Recentes (16/11/2026)
@@ -107,6 +110,7 @@ Teste_car_0/
 - `robo_monitor/capturar_dump.py` — captura via serial.
 - `robo_monitor/robo_ws_logger.py --replay dump.txt --saida out.csv` — converte o dump em CSV.
 - `diag_motor_curve/` com Wi-Fi: varredura não-bloqueante, buffer em RAM e página web (`sweep`/`csv`/`clear`).
+- **ESP-NOW no robô (`espnow_link.h`)**: telemetria JSON a 5 Hz ao gateway ESP32-S3 e recepção dos comandos `start`/`stop`/`pause`/`reset`/`dump`. Compatível com ESP-IDF v4/v5. `robo_monitor/gateway_espnow.py` é a ponte serial do gateway.
 
 ## 📄 Atualizações Recentes (13/11/2026)
 
