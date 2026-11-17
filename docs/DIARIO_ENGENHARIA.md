@@ -276,8 +276,9 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
   * O `<script src>` do dashboard aponta para `/chartjs.min.js`.
 * **Decisão — gzip:** o pacote minificado tem **208 KB**. A partição de app é de 1,25 MB e o sketch já ocupava 1.052 KB (80%), então sobravam ~258 KB. Servir sem compressão deixaria só ~50 KB de folga. Com **gzip** o pacote cai para **70,8 KB**, sobrando ~188 KB. A rota responde `Content-Encoding: gzip` e o browser descomprime.
   * Alternativa recusada: SPIFFS/LittleFS — exigiria formatar e manter um filesystem, mais peças móveis para o mesmo resultado.
-* **Custo de build:** o header gerado tem 365 KB de fonte (70,8 KB de dados), o que **aumentou o tempo de compilação** de ~40 s para ~4 min. É o preço de embutir o asset; o tempo de execução não é afetado.
+* **Custo de build:** o array de 70,8 KB ficou em `chartjs_asset.cpp` (o header tem só a declaração). Assim editar o dashboard não recompila o asset: **editar `wifi_telemetry.h` caiu de 4m26s para 1m04s**. Regenerar o asset é a única ocasião em que o `.cpp` é tocado. O tempo de execução não é afetado.
 * **Licença:** Chart.js é MIT; o aviso de licença está no header gerado.
+* **Reprodutibilidade:** `ferramentas/gerar_chartjs_asset.py` baixa (ou lê) o UMD min, aplica gzip e regenera `.h` + `.cpp`.
 
 ---
 

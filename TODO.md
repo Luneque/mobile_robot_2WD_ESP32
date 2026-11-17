@@ -52,7 +52,8 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 
 4. ~~**Dashboard depende de internet (Chart.js via CDN).**~~ **ATENDIDO (17/11/2026).**
    - O Chart.js 4.5.1 (UMD min) passou a ser servido pelo próprio ESP32 em `/chartjs.min.js`; o dashboard não depende mais de CDN nem de upstream do AP.
-   - Ativo: `chartjs_asset.h` (gerado, 365 KB de fonte) com o pacote **gzip** (70,8 KB em vez de 208 KB) em PROGMEM; a rota responde `Content-Type: application/javascript` + `Content-Encoding: gzip`.
+   - Ativo: `chartjs_asset.h` + `chartjs_asset.cpp` (gerados por `ferramentas/gerar_chartjs_asset.py`), com o pacote **gzip** (70,8 KB em vez de 208 KB) em PROGMEM; a rota responde `Content-Type: application/javascript` + `Content-Encoding: gzip`.
+   - O array vive em `.cpp` justamente para não recompilar quando o dashboard muda: editar `wifi_telemetry.h` caiu de 4m26s para 1m04s.
    - Compressão foi necessária porque o app está em 80% da flash (1,25 MB de partição): sem gzip o pacote custaria 208 KB e deixaria só ~50 KB de folga.
 
 5. ~~**Mapa 2D usa ângulos nominais por lado.**~~ **ATENDIDO (17/11/2026).**
