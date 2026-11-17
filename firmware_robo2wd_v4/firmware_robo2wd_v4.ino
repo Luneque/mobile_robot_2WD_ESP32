@@ -89,6 +89,8 @@ float g_distanciaTotalMm = 0.0f;
 float g_anguloTotalGraus = 0.0f;
 int g_sentidoGiro = 1; // +1 = Direita (Horário)
 float g_yawStartSeg = 0.0f; // Ângulo de yaw exato no instante em que o movimento inicia
+float g_yawAbs = 0.0f;      // Rumo GLOBAL (graus, horário) acumulado entre segmentos
+float g_yawPrevAmostra = 0.0f; // Yaw relativo da amostra anterior (para integrar o delta)
 
 // =========================================================================
 // PERFIL TRAPEZOIDAL DE VELOCIDADE
@@ -153,6 +155,7 @@ void iniciarMovimentoReta(float distanciaMm) {
     pid2.reset();
     imu.resetYaw(); // Zera a orientação de referência para a reta
     g_yawStartSeg = 0.0f;
+    g_yawPrevAmostra = 0.0f; // o rumo global (g_yawAbs) é acumulado entre segmentos
     g_desbalStartTime = 0;
     subEstado = SUB_EM_MOVIMENTO;
     Serial.printf("\n[V4-RETA] Lado %d de %d | Dist: %.1f mm | Alvo: %d ticks\n",
@@ -170,6 +173,7 @@ void iniciarMovimentoCurva(float anguloGraus, int sentido) {
     pid2.reset();
     imu.resetYaw(); // Zera o acumulador de yaw
     g_yawStartSeg = imu.getYawAngleDeg(); // Captura o valor exato no instante zero
+    g_yawPrevAmostra = 0.0f;
     g_desbalStartTime = 0;
     subEstado = SUB_EM_MOVIMENTO;
     Serial.printf("\n[V4-PIVO] Curva %d de %d | Angulo: %.1f deg (%s) | Alvo: %d ticks/roda\n",
@@ -183,6 +187,14 @@ void processarControleMovimento(uint32_t now) {
     encoders.updateSpeed(dt);
     if (imu.isInitialized()) {
         imu.update(dt);
+    }
+
+    // Integra o rumo global: o yaw da IMU e' relativo ao inicio do segmento
+    // (resetYaw a cada segmento), entao soma-se o delta entre amostras.
+    if (imu.isInitialized()) {
+        float yawAmostra = imu.getYawAngleDeg();
+        g_yawAbs += (yawAmostra - g_yawPrevAmostra);
+        g_yawPrevAmostra = yawAmostra;
     }
 
     float rpm1 = encoders.getRPM1();
@@ -366,6 +378,7 @@ void enviarTelemetria(uint32_t now) {
     pkt.lado       = g_ladoAtual;
     pkt.totalLados = QUADRADO_LADOS;
     pkt.yaw        = yaw;
+    pkt.yawAbs     = g_yawAbs;   // rumo global integrado (horário = positivo)
     pkt.rpm1       = rpm1;
     pkt.rpm2       = rpm2;
     pkt.ticks1     = t1;
@@ -404,12 +417,13 @@ void enviarTelemEspNow(uint32_t now) {
     else if (estadoAtual == ESTADO_FALHA_HARDWARE) estadoStr = "FALHA";
     else if (estadoAtual == ESTADO_ARMANDO_ESC) estadoStr = "ARMANDO";
 
+    // JSON da telemetria ESP-NOW (~185 bytes no pior caso)
     char buf[200];
     int n = snprintf(buf, sizeof(buf),
-        "{\"ts\":%lu,\"st\":\"%s\",\"sd\":%d,\"of\":%d,\"yaw\":%.2f,"
+        "{\"ts\":%lu,\"st\":\"%s\",\"sd\":%d,\"of\":%d,\"yaw\":%.2f,\"yawAbs\":%.2f,"
         "\"r1\":%.1f,\"r2\":%.1f,\"t1\":%ld,\"t2\":%ld,\"tg\":%ld,"
         "\"w1\":%u,\"w2\":%u,\"rt\":%.1f}",
-        (unsigned long)now, estadoStr, g_ladoAtual, QUADRADO_LADOS, yaw,
+        (unsigned long)now, estadoStr, g_ladoAtual, QUADRADO_LADOS, yaw, g_yawAbs,
         rpm1, rpm2, (long)t1, (long)t2, (long)g_targetTicks,
         (unsigned)g_lastPwm1, (unsigned)g_lastPwm2,
         g_emLinhaReta ? VELOCIDADE_CRUZEIRO_RPM : VELOCIDADE_GIRO_RPM);
@@ -452,7 +466,7 @@ void gravarAmostraRecorder(uint32_t now) {
                         : 0.0f;
 
     recorder.sample(now, codigoEstadoRecorder(), (uint8_t)g_ladoAtual,
-                   yaw, rpm1, rpm2, t1, t2, g_targetTicks,
+                   yaw, g_yawAbs, rpm1, rpm2, t1, t2, g_targetTicks,
                    g_lastPwm1, g_lastPwm2, rpmAlvo);
 }
 
@@ -662,6 +676,10 @@ void loop() {
             if (estadoAtual == ESTADO_AGUARDO_INICIO || estadoAtual == ESTADO_CONCLUIDO) {
                 Serial.println("\n>>> COMANDO RECEBIDO! INICIANDO TRAJETÓRIA DO QUADRADO <<<");
                 recorder.clear();
+                // Ancora o referencial de rumo no início do trajeto: sem isso, a
+                // deriva do giroscópio acumulada enquanto o robô ficou parado
+                // (tipicamente 2–3°) apareceria como erro lateral no mapa.
+                g_yawAbs = 0.0f;
                 g_ladoAtual = 1;
                 subEstado = SUB_INICIAR_SEGMENTO;
                 g_emLinhaReta = true;
@@ -688,6 +706,7 @@ void loop() {
             }
         } else if (cmdTxt == "reset") {
             recorder.clear();
+            g_yawAbs = 0.0f;   // reancora o referencial de rumo
             g_ladoAtual = 1;
             g_emLinhaReta = true;
             subEstado = SUB_INICIAR_SEGMENTO;
@@ -729,6 +748,7 @@ void loop() {
                 if (comandoRecebido) {
                     Serial.println("\n>>> COMANDO RECEBIDO! INICIANDO TRAJETÓRIA DO QUADRADO <<<");
                     recorder.clear(); // Descarta amostras do teste anterior
+                    g_yawAbs = 0.0f;   // ancora o referencial de rumo no início
                     g_ladoAtual = 1;
                     subEstado = SUB_INICIAR_SEGMENTO;
                     g_emLinhaReta = true;
@@ -740,6 +760,7 @@ void loop() {
             if (!g_wifiOk && now - g_pausaStartTime >= 5000) {
                 Serial.println("\n>>> TIMEOUT DE 5s ATINGIDO! INICIANDO TRAJETÓRIA DO QUADRADO <<<");
                 recorder.clear();
+                g_yawAbs = 0.0f;   // ancora o referencial de rumo no início
                 g_ladoAtual = 1;
                 subEstado = SUB_INICIAR_SEGMENTO;
                 g_emLinhaReta = true;

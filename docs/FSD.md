@@ -179,5 +179,5 @@ stateDiagram-v2
 ## 📄 Atualizações Recentes (13/11/2026)
 
 - **Firmware:** odometria recalibrada para roda de 66 mm (10.417 ticks por reta de 500 mm); corte de pivô por delta real de yaw (`g_yawStartSeg`) com guarda de 200 ticks; `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0`; limite de PWM ±50 µs; giro pivô suavizado para 35 RPM.
-- **Dashboard Web:** mapa 2D com quadrado ideal (500 mm), rastro real por odometria cumulativa, pose (X, Y, θ) e seta de direção corrigida.
+- **Dashboard Web:** mapa 2D com quadrado ideal (500 mm), rastro real por odometria cumulativa, pose (X, Y, θ) e seta de direção. O rastro usa o **rumo global real** integrado do yaw da IMU (`yawAbs`), não ângulos nominais por lado — o desvio angular medido aparece no traçado.
 - **Documentação:** README, Diário de Engenharia, FSD e Manual Técnico consolidados com os valores vigentes.

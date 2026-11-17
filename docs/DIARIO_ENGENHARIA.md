@@ -240,7 +240,34 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 15. Resumo da Estrutura Atual do Repositório
+### 15. Etapa 15: Mapa 2D com Orientação Real (17/11/2026)
+
+* **Problema (item 5 do TODO):** o mapa desenhava o rastro com `baseDeg` nominal por lado (0/270/180/90), então o erro angular real ficava mascarado — o traçado não refletia o desvio medido.
+* **Solução:** integração do **rumo global real** (`g_yawAbs`) no firmware:
+  * A IMU zera o yaw a cada segmento (`resetYaw()`), então o rumo global é acumulado pelo delta entre amostras (`g_yawAbs += yaw - g_yawPrevAmostra`), com o delta zerado a cada segmento.
+  * Enviado como `yawAbs` no WebSocket, no ESP-NOW e no gravador (nova coluna `yaw_abs_deg`).
+  * O dashboard passou a usar esse rumo no lugar do `baseDeg`.
+* **Referencial ancorado no `start`:** o `yaw_abs` é acumulado desde o boot e, após ~140 s parado, já havia derivado ~2,8°. Isso sozinho gerava **35 mm** de erro lateral em L1. O `start` (e o `reset`) agora fazem `g_yawAbs = 0`, reduzindo esse erro para **13 mm**.
+* **Bug de sinal que a versão nominal escondia:** o quadrado ideal desenhado era **horário**, mas o trajeto real é **anti-horário**. O BMI160 tem o eixo Z para cima, logo yaw positivo = anti-horário (regra da mão direita); o mapa usa ângulos horário-positivos (0 = +Y, 90 = +X). O rumo renderizado passou a ser `-yawAbs`. Com o `baseDeg` nominal, o desenho e a referência errados se cancelavam — por isso o bug passou despercebido.
+* **Validação no solo (robô no solo, autorização explícita do usuário):**
+
+  | Métrica | Valor |
+  | :--- | :--- |
+  | `yaw_abs` | 0 → 89,6 → 178,7 → 268,0 → 357,4 |
+  | Erro por lado | 13 / 20 / 18 / 14 mm |
+  | Fechamento | 14 mm |
+  | Pico de RPM | 54,2–55,1 (média 54,5) |
+  | Pivôs | 89,78–90,98° (desvio 0,46°) |
+
+  * No browser, o rastro verde ocupa X −6..508 / Y 3..512 e o quadrado ideal X 86..314 / Y 86..314 (pixels) — sobreposição direta.
+* **Custos:** o campo novo (`int16_t`, graus × 10) levou a `RecSample` de 32 para 36 bytes por alinhamento; o buffer do gravador foi ajustado de 2000 para **1984 amostras** (99,2 s) para caber na DRAM. Compilação: 1.052.431 bytes (80%) flash, 124.240 (37%) RAM.
+* **Lição de método (duas):**
+  1. **Teste com o robô suspenso não valida odometria.** Em duas rodadas o yaw ficou zerado porque o robô estava suspenso para gravação — as rodas giram, mas o corpo não. A partir de agora, toda validação de orientação exige confirmação explícita de que o robô está no solo.
+  2. **Não inferir a direção do movimento a partir de um comentário de código.** A correção do quadrado ideal foi feita a partir de `g_sentidoGiro = 1 // Horário`, que não correspondia ao mundo real. A sequência de pontos já havia sido definida pelo usuário e estava correta no código original.
+
+---
+
+### 16. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.

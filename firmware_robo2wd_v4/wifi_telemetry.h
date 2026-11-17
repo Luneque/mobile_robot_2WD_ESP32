@@ -53,7 +53,8 @@ struct TelemetryPacket {
     const char* estado;      // "AGUARDO","RETA","PIVO","PAUSA","CONCLUIDO","EMERGENCIA","FALHA"
     int         lado;        // segmento atual (1–4)
     int         totalLados;  // sempre 4
-    float       yaw;         // graus (com sinal)
+    float       yaw;         // graus (com sinal, relativo ao início do segmento)
+    float       yawAbs;      // graus (absoluto desde o boot; usado no mapa 2D)
     float       rpm1;        // RPM motor esquerdo
     float       rpm2;        // RPM motor direito
     int32_t     ticks1;      // ticks encoder esquerdo (valor absoluto)
@@ -160,48 +161,51 @@ const MM_PER_TICK = 0.04799656; // 66mm diametro / 4320 ticks
 let posX = 500, posY = 0; // Ponto de partida real: Início (500, 0)
 let prevTicks = 0, prevSegSide = -1, prevSegState = '';
 let trajectory = [{x: 500, y: 0}];
-let curHeadingDeg = 0;
+let curHeadingDeg = 0;      // Rumo GLOBAL real (0 = +Y, 90 = +X), integrado do yaw
+let yawAbs = 0;             // Rumo global (graus, horário = positivo), integrado do yaw
+let lastSt = '', lastSide = -1;
 
 function resetMap() {
-  posX = 500; posY = 0; curHeadingDeg = 0;
+  posX = 500; posY = 0;
+  // Mantém o rumo global atual: o yaw_abs do firmware é acumulado desde o
+  // boot e não zera a cada trajeto, então zerar aqui dessintonizaria o mapa.
+  curHeadingDeg = yawParaRumo(yawAbs);
   prevTicks = 0; prevSegSide = -1; prevSegState = '';
   trajectory = [{x: 500, y: 0}];
   drawMap();
 }
 
+// Converte o yaw absoluto do firmware para o rumo global do mapa.
+// O BMI160 tem o eixo Z para cima: yaw positivo = rotação ANTI-HORÁRIA
+// (regra da mão direita). O mapa usa ângulos HORÁRIO-positivos
+// (0 = +Y, 90 = +X), então o rumo é o negativo do yaw.
+function yawParaRumo(graus) {
+  return ((-graus) % 360 + 360) % 360;
+}
+
 function updateOdometry(d) {
   const curAvgTicks = (d.t1 + d.t2) / 2;
-  
-  // Transição de estado/lado
-  if (d.sd !== prevSegSide || d.st !== prevSegState) {
-    prevTicks = curAvgTicks;
-    prevSegSide = d.sd;
-    prevSegState = d.st;
-    
-    // Se completou várias voltas e reiniciou no L1, reinicia o rastro no Início
+
+  // Detecta transição de segmento (mudou estado ou lado)
+  const mudouSeg = (d.st !== lastSt || d.sd !== lastSide);
+  lastSt = d.st; lastSide = d.sd;
+
+  if (mudouSeg) {
+    // Ao iniciar a 1ª reta (lado 1) depois de várias voltas, reinicia o rastro
     if (d.st === 'RETA' && d.sd === 1 && trajectory.length > 500) {
       posX = 500; posY = 0;
       trajectory = [{x: 500, y: 0}];
     }
+    prevTicks = curAvgTicks;
   }
 
-  const deltaTicks = curAvgTicks - prevTicks;
-  
-  // Geometria real homologada:
-  // Início (500, 0) -> L1 (500, 500) -> L2 (0, 500) -> L3 (0, 0) -> Início (500, 0)
-  // L1: sobe (+Y)              -> base 0°
-  // L2: vai para esquerda (-X) -> base 270°
-  // L3: desce (-Y)             -> base 180°
-  // L4: vai para direita (+X)  -> base 90°
-  let baseDeg = 0;
-  if (d.sd === 1) baseDeg = 0;
-  else if (d.sd === 2) baseDeg = 270;
-  else if (d.sd === 3) baseDeg = 180;
-  else if (d.sd === 4) baseDeg = 90;
-
+  // Integra o rumo global a partir do yaw absoluto da IMU.
+  // Na reta, o robô anda no rumo corrente; o yaw medido já inclui o desvio real.
   if (d.st === 'RETA') {
-    // Na reta, o desvio yaw positivo gira para a direita (+deg)
-    curHeadingDeg = (baseDeg + d.yaw);
+    yawAbs = d.yawAbs !== undefined ? d.yawAbs : yawAbs;
+    curHeadingDeg = yawParaRumo(yawAbs);
+
+    const deltaTicks = curAvgTicks - prevTicks;
     if (deltaTicks > 0) {
       const deltaDist = deltaTicks * MM_PER_TICK;
       const rad = (curHeadingDeg * Math.PI) / 180.0;
@@ -211,9 +215,9 @@ function updateOdometry(d) {
       prevTicks = curAvgTicks;
     }
   } else if (d.st === 'PIVO') {
-    // No pivô CCW (giro à esquerda), d.yaw vai de 0 a +90°.
-    // A orientação do robô transiciona suavemente de baseDeg para (baseDeg - 90°)
-    curHeadingDeg = (baseDeg - d.yaw);
+    // No pivô, o yaw absoluto cresce (giro horário); o rumo acompanha.
+    yawAbs = d.yawAbs !== undefined ? d.yawAbs : yawAbs;
+    curHeadingDeg = yawParaRumo(yawAbs);
     prevTicks = curAvgTicks;
   }
 }
@@ -230,18 +234,17 @@ function drawMap() {
   ctx.save();
   ctx.strokeStyle = '#161b22';
   ctx.lineWidth = 1;
-  const margin = 50;
-  const mapSize = 500; // Quadrado ideal de 500mm
-  const scale = (w - 2 * margin) / 600; // Escala: 600mm cabe com folga
+  const margin = 40;
+  // Janela de visão em milímetros: o percurso é o quadrado anti-horário
+  // (500,0)->(500,500)->(0,500)->(0,0), com margem para os rótulos.
+  const viewW = 700, viewH = 700;
+  const scale = Math.min((w - 2 * margin) / viewW, (h - 2 * margin) / viewH);
+  const cx = 250, cy = 250;   // centro da visão, em mm
   
-  // Transformação: Origem (0,0) fica no canto inferior esquerdo do quadrado
-  // Canvas: X_screen = origX + x * scale
-  //         Y_screen = origY - y * scale (eixo Y invertido no canvas)
-  const origX = margin + 50 * scale;
-  const origY = h - margin - 50 * scale;
-  
+  // Transformação: X cresce para a direita, Y cresce para cima
+  // (o canvas tem Y para baixo, daí o sinal negativo)
   function toScreen(x, y) {
-    return { x: origX + x * scale, y: origY - y * scale };
+    return { x: w / 2 + (x - cx) * scale, y: h / 2 - (y - cy) * scale };
   }
   
   // Linhas de grade
@@ -255,9 +258,9 @@ function drawMap() {
     ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
   }
   
-  // 1. Quadrado Ideal (500x500 mm) em Azul tracejado
-  // Percurso Real do Robô:
-  // Início (500,0) -> L1 (500,500) -> L2 (0,500) -> L3 (0,0) -> Início (500,0)
+  // 1. Quadrado Ideal (500x500 mm) em Azul tracejado.
+  // Sequência definida do trajeto (giro à esquerda / anti-horário):
+  // Início (500,0) -> L1 (500,500) -> L2 (0,500) -> L3 (0,0) -> Início
   const pInicio = toScreen(500, 0);
   const pL1     = toScreen(500, 500);
   const pL2     = toScreen(0, 500);
@@ -394,13 +397,13 @@ function handle(d){
   updateOdometry(d);
   drawMap();
   // CSV buffer
-  csvRows.push([d.ts,d.st,d.sd,d.of,d.yaw,d.r1,d.r2,d.t1,d.t2,d.tg,d.w1,d.w2,d.rt]);
+  csvRows.push([d.ts,d.st,d.sd,d.of,d.yaw,d.yawAbs,d.r1,d.r2,d.t1,d.t2,d.tg,d.w1,d.w2,d.rt]);
 }
 
 // Download CSV
 function downloadCsv(){
   if(!csvRows.length){ alert('Sem dados ainda.'); return; }
-  const hdr = 'ts,estado,lado,totalLados,yaw,rpm1,rpm2,ticks1,ticks2,ticksAlvo,pwm1,pwm2,rpmAlvo\n';
+  const hdr = 'ts,estado,lado,totalLados,yaw,yawAbs,rpm1,rpm2,ticks1,ticks2,ticksAlvo,pwm1,pwm2,rpmAlvo\n';
   const body = csvRows.map(r=>r.join(',')).join('\n');
   const blob = new Blob([hdr+body],{type:'text/csv'});
   const a = document.createElement('a');
@@ -495,6 +498,7 @@ public:
         doc["sd"]  = pkt.lado;
         doc["of"]  = pkt.totalLados;
         doc["yaw"] = roundf(pkt.yaw * 100.0f) / 100.0f;
+        doc["yawAbs"] = roundf(pkt.yawAbs * 100.0f) / 100.0f;
         doc["r1"]  = roundf(pkt.rpm1 * 10.0f) / 10.0f;
         doc["r2"]  = roundf(pkt.rpm2 * 10.0f) / 10.0f;
         doc["t1"]  = pkt.ticks1;

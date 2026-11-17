@@ -54,9 +54,13 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
    - `wifi_telemetry.h:80`: `<script src="https://cdn.jsdelivr.net/npm/chart.js">`.
    - Se o AP não tiver upstream, os gráficos não carregam (o mapa 2D, que é Canvas puro, continua funcionando).
 
-5. **Mapa 2D usa ângulos nominais por lado.**
-   - `wifi_telemetry.h:199-203` força `baseDeg` (0/270/180/90) por `d.sd`.
-   - Isso **mascara o erro real de orientação**: o rastro desenhado não reflete o desvio angular medido. É o mesmo problema que a Etapa 11 do Diário corrigiu parcialmente (a correção de rumo existe, mas o `baseDeg` ainda é nominal).
+5. ~~**Mapa 2D usa ângulos nominais por lado.**~~ **ATENDIDO (17/11/2026).**
+   - Removido o `baseDeg` nominal por lado. O mapa agora integra o **rumo global real** (`g_yawAbs`), acumulado do yaw da IMU e ancorado no `start`.
+   - O firmware envia `yawAbs` no WebSocket, no ESP-NOW e no gravador (nova coluna `yaw_abs_deg` no CSV).
+   - **O erro angular real passou a aparecer** — que era exatamente o objetivo.
+   - Validação no solo: trajetória anti-horária fechando em **14 mm**; erro por lado 13/20/18/14 mm; pico de 54,5 RPM; pivôs 89,78–90,98°.
+   - **Correção de rumo que a versão nominal escondia:** o quadrado ideal desenhado era horário, mas o trajeto real é anti-horário. O BMI160 tem Z para cima (yaw positivo = anti-horário, regra da mão direita) e o mapa usa convenção horária, então o rumo renderizado é `-yawAbs`.
+   - **Deriva em repouso:** o `yaw_abs` acumulado desde o boot chegava a ~2,8° no momento do `start` (140 s parado), o que sozinho gerava ~35 mm de erro lateral em L1. O referencial agora é ancorado no `start` (`g_yawAbs = 0`), reduzindo esse erro para 13 mm.
 
 6. **Sem testes automatizados.**
    - Não há nenhum teste unitário, de integração ou de regressão.
@@ -133,7 +137,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 1. ~~**[P1]** Decidir o destino do ESP-NOW~~ — **atendido**: implementado o lado do robô (`espnow_link.h`) + ponte `gateway_espnow.py`. Resta validar com o ESP32-S3 e, se desejado, trocar broadcast por MAC dedicado.
 2. **[P1]** Monitor de bateria (hardware + `PIN_BATTERY_ADC` + alerta/telemetria).
 3. **[P2]** Chart.js local (baixar o arquivo para PROGMEM ou servir do SPIFFS).
-4. **[P2]** Mapa 2D com orientação real medida (remover `baseDeg` nominal).
+4. ~~**[P2]** Mapa 2D com orientação real medida (remover `baseDeg` nominal).~~ **ATENDIDO (17/11/2026)** — ver item 5 dos problemas de fundo.
 5. **[P2]** Testes automatizados: ao menos um teste de regressão da interpolação da curva e do critério de corte do pivô, com CI.
 6. **[P3]** Higiene: comentários do `config.h`, remover `IMU_HABILITADA`, atualizar FSD:27 e a seção 5 do Manual, `secrets.h.example` para o `diag_motor_curve`.
 7. **[P3]** Decidir o destino de `diag_motor_curve/gráfico.png`.
