@@ -1,0 +1,2 @@
+// fixture gerado de um teste real no solo (dump_solo_final, 17/11/2026).
+// Usado pelos testes do replay para garantir o formato do dump.

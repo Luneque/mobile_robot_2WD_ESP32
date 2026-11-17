@@ -3,6 +3,7 @@
 #include "motor_control_mcpwm.h"
 #include "encoder_reader_pcnt.h"
 #include "pid_controller.h"
+#include "robo_matematica.h"
 #include "imu_bmi160.h"
 #include "esp_task_wdt.h"
 #include "wifi_telemetry.h"
@@ -148,7 +149,7 @@ float calcularRPMTrapezoidalCurva(int32_t currentTicks, int32_t targetTicks) {
 
 void iniciarMovimentoReta(float distanciaMm) {
     g_distanciaTotalMm = distanciaMm;
-    g_targetTicks = (int32_t)(distanciaMm / MM_POR_PULSO);
+    g_targetTicks = ticksParaMm(distanciaMm);
     g_emLinhaReta = true;
     encoders.reset();
     pid1.reset();
@@ -165,8 +166,7 @@ void iniciarMovimentoReta(float distanciaMm) {
 void iniciarMovimentoCurva(float anguloGraus, int sentido) {
     g_anguloTotalGraus = anguloGraus;
     g_sentidoGiro = sentido;
-    float arco_mm = (PI * DIST_RODAS_MM * (anguloGraus / 360.0f));
-    g_targetTicks = (int32_t)(arco_mm / MM_POR_PULSO);
+    g_targetTicks = ticksParaArcoPivo(anguloGraus);
     g_emLinhaReta = false;
     encoders.reset();
     pid1.reset();

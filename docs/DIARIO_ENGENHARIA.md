@@ -282,7 +282,27 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 17. Resumo da Estrutura Atual do Repositório
+### 17. Etapa 17: Testes Automatizados e CI (17/11/2026)
+
+* **Problema (item 6 do TODO):** nenhuma validação automática. Toda mudança dependia de teste manual em solo — e o projeto já foi vítima disso: o replay quebrou duas vezes quando o número de colunas do dump mudou (12→13→14), e o teste da antecipação de 0,7° foi descartado porque o robô estava suspenso.
+* **Escopo escolhido (primeira leva):** o que é puro e tem alto impacto. Ficaram de fora, por enquanto, o critério de corte do pivô (mexe no laço de controle), o perfil trapezoidal e o `yawParaRumo()` do dashboard (JS).
+* **O obstáculo:** a lógica vivia embutida em `.ino`/`.h` que incluem `Arduino.h`. Solução em duas partes:
+  * `firmware_robo2wd_v4/robo_matematica.h` — `ticksParaMm()` e `ticksParaArcoPivo()` extraídas do `iniciarMovimentoReta/Curva`. **Fórmulas idênticas**; o binário resultante tem o mesmo tamanho (1.123.859 bytes).
+  * `tests/native/Arduino.h` — stub mínimo. Na prática os headers só usam `PI` e `abs()`; se precisarem de mais, o stub cresce.
+* **Testes criados:**
+  * `tests/native/test_cinematica.cpp` — **12 testes** sobre os headers **reais** (nada de fórmula copiada): `MM_POR_PULSO`, 500 mm → 10417 ticks, pivô de 90° → 1963 ticks, saturação da curva, pontos medidos em bancada e o feedforward de 55 RPM sob carga (208,6 µs).
+  * `tests/python/test_ferramentas.py` — **11 testes**: replay do dump (13 colunas, valores preservados, contagem) e consistência de formato entre dump, logger, gateway e dashboard.
+  * `tests/native/rodar.py` — compila e executa; escolhe `CXX`, `ziglang` (pip) ou `g++`/`clang++`.
+* **CI:** `.github/workflows/ci.yml`, dois jobs:
+  * `testes` — Python + nativo.
+  * `build` — gera `secrets.h` a partir do exemplo e compila o firmware do robô **e** o gateway (`arduino/compile-sketches`).
+* **Validação local:** 12/12 nativos e 11/11 Python passando; firmware 1.123.859 bytes (85%), gateway 885.292 bytes (67%); YAML validado.
+* **Observação de formato descoberta:** o CSV do gateway tem **14** colunas (inclui `total_lados`, campo `of` do JSON) e o do replay tem **13** (o dump não grava `total_lados` para economizar RAM). Não é bug — fica documentado nos testes.
+* **Próximo passo sugerido:** extrair `atingiuMetaPivo()` para testar o corte do pivô. É o teste mais valioso (a antecipação de 0,7° e a guarda de 200 ticks foram calibradas por tentativa) e o mais sensível.
+
+---
+
+### 18. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.

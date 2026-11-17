@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  testes:
+    name: Testes (Python + nativo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Testes das ferramentas (Python)
+        run: python -m unittest discover -s tests/python
+
+      - name: Testes nativos do firmware
+        run: python tests/native/rodar.py
+
+  build:
+    name: Compilação do firmware (esp32)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # O firmware precisa de secrets.h (SSID/senha), que fica fora do git.
+      - name: Prepara secrets.h
+        run: cp firmware_robo2wd_v4/secrets.h.example firmware_robo2wd_v4/secrets.h
+
+      - name: Compila firmware do robô e do gateway
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: esp32:esp32:esp32
+          platforms: |
+            - name: esp32:esp32
+          sketch-paths: |
+            - firmware_robo2wd_v4
+            - gateway_espnow

@@ -64,10 +64,13 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
    - **Correção de rumo que a versão nominal escondia:** o quadrado ideal desenhado era horário, mas o trajeto real é anti-horário. O BMI160 tem Z para cima (yaw positivo = anti-horário, regra da mão direita) e o mapa usa convenção horária, então o rumo renderizado é `-yawAbs`.
    - **Deriva em repouso:** o `yaw_abs` acumulado desde o boot chegava a ~2,8° no momento do `start` (140 s parado), o que sozinho gerava ~35 mm de erro lateral em L1. O referencial agora é ancorado no `start` (`g_yawAbs = 0`), reduzindo esse erro para 13 mm.
 
-6. **Sem testes automatizados.**
-   - Não há nenhum teste unitário, de integração ou de regressão.
-   - A calibração depende de testes manuais em solo, com risco de teste contaminado (aconteceu: o teste com antecipação 0,7° foi descartado porque o robô não estava no solo).
-   - Ausência de CI (`.github/workflows` não existe).
+6. ~~**Sem testes automatizados.**~~ **PARCIALMENTE ATENDIDO (17/11/2026).**
+   - Criado o diretório `tests/` com testes que rodam **sem hardware**:
+     - `tests/native/test_cinematica.cpp` — 12 testes sobre os headers **reais** do firmware (a única dependência de Arduino é suprida pelo stub `tests/native/Arduino.h`): `MM_POR_PULSO`, ticks por reta de 500 mm (10417), ticks do pivô de 90° (1963), interpolação da curva PWM×RPM e o feedforward de 55 RPM sob carga. Roda com `python tests/native/rodar.py` (escolhe `CXX`, `ziglang` ou `g++`/`clang++`).
+     - `tests/python/test_ferramentas.py` — 11 testes: replay do dump para CSV (colunas, valores, contagem) e consistência de formato entre dump, logger, gateway e dashboard. É a classe de bug que já quebrou de verdade (o replay falhou quando as colunas mudaram 12→13→14).
+   - **CI:** `.github/workflows/ci.yml` com dois jobs — `testes` (Python + nativo) e `build` (compila o firmware do robô e o gateway via `arduino/compile-sketches`).
+   - Para viabilizar os testes nativos, `ticksParaMm()` e `ticksParaArcoPivo()` foram extraídas para `firmware_robo2wd_v4/robo_matematica.h` — **as fórmulas são idênticas** e o binário resultante tem o mesmo tamanho (1.123.859 bytes).
+   - **O que falta para fechar o item:** testes do critério de corte do pivô (extrair `atingiuMetaPivo()`), do perfil trapezoidal e do `yawParaRumo()` do dashboard (JS). Os dois últimos exigem mais refactor; o do pivô é o mais valioso e o mais sensível (mexe no laço de controle).
 
 7. ~~**Telemetria de 5 Hz é pouco para análise dinâmica.**~~ **ATENDIDO (16/11/2026).**
    - Implementada **telemetria adaptativa**: 20 Hz durante `RETA`/`PIVO`, 2 Hz em `AGUARDO`/`CONCLUIDO` (WebSocket e ESP-NOW).
@@ -140,7 +143,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 2. **[P1]** Monitor de bateria (hardware + `PIN_BATTERY_ADC` + alerta/telemetria).
 3. ~~**[P2]** Chart.js local (baixar o arquivo para PROGMEM ou servir do SPIFFS).~~ **ATENDIDO (17/11/2026)** — servido de `/chartjs.min.js` pelo próprio ESP32 (gzip em PROGMEM).
 4. ~~**[P2]** Mapa 2D com orientação real medida (remover `baseDeg` nominal).~~ **ATENDIDO (17/11/2026)** — ver item 5 dos problemas de fundo.
-5. **[P2]** Testes automatizados: ao menos um teste de regressão da interpolação da curva e do critério de corte do pivô, com CI.
+5. ~~**[P2]** Testes automatizados: ao menos um teste de regressão da interpolação da curva e do critério de corte do pivô, com CI.~~ **PARCIALMENTE ATENDIDO (17/11/2026)** — CI criada e testes da curva/cinemática/ferramentas passando; falta o teste do critério de corte do pivô.
 6. **[P3]** Higiene: comentários do `config.h`, remover `IMU_HABILITADA`, atualizar FSD:27 e a seção 5 do Manual, `secrets.h.example` para o `diag_motor_curve`.
 7. **[P3]** Decidir o destino de `diag_motor_curve/gráfico.png`.
 
