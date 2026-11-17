@@ -16,6 +16,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Instala dependências das ferramentas
+        run: pip install -r robo_monitor/requirements.txt
+
       - name: Testes das ferramentas (Python)
         run: python -m unittest discover -s tests/python
 
@@ -38,6 +41,10 @@ jobs:
           fqbn: esp32:esp32:esp32
           platforms: |
             - name: esp32:esp32
+          libraries: |
+            # dependências externas do firmware (as do core ESP32 vêm junto)
+            - name: WebSockets
+            - name: ArduinoJson
           sketch-paths: |
             - firmware_robo2wd_v4
             - gateway_espnow
