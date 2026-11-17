@@ -121,7 +121,12 @@
 #define WIFI_HTTP_PORT          80          // Porta do servidor HTTP (dashboard)
 #define WIFI_WS_PORT            81          // Porta do servidor WebSocket (telemetria)
 #define WIFI_CONNECT_TIMEOUT_MS 10000       // Timeout de conexão Wi-Fi (10s)
-#define TELEM_INTERVAL_MS       200         // Intervalo de envio de telemetria (5 Hz)
+// Telemetria adaptativa: o loop de controle roda a 50 Hz (20 ms) e o envio
+// WebSocket e bloqueante, então a taxa acompanha o estado do robo.
+// Em movimento usa 20 Hz (resolucao para analise de pico/rampa/corte do pivo);
+// em repouso, 2 Hz (so para o dashboard nao congelar).
+#define TELEM_INTERVAL_MOV_MS   50          // 20 Hz durante RETA/PIVO
+#define TELEM_INTERVAL_IDLE_MS  500         // 2 Hz em AGUARDO/CONCLUIDO
 
 // ==========================================
 // 8. ESP-NOW (Gateway ESP32-S3 Super Mini)
@@ -136,8 +141,6 @@
 // MAC do gateway ESP32-S3 (preencher apos gravar gateway_espnow.ino e ler o MAC
 // impresso no Serial). Broadcast = envia para qualquer gateway no canal.
 #define ESPNOW_GATEWAY_MAC      {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
-// Telemetria ESP-NOW em Hz (redundancia/alternativa ao Wi-Fi).
-#define ESPNOW_TELEM_HZ         5
 // Timeout sem receber do gateway: apos este periodo o robo reporta falha de enlace.
 #define ESPNOW_LINK_TIMEOUT_MS  3000
 

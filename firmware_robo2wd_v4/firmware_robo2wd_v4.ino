@@ -321,7 +321,12 @@ void processarControleMovimento(uint32_t now) {
 // =========================================================================
 void enviarTelemetria(uint32_t now) {
     if (!g_wifiOk || !wirelessTelem.hasClients()) return;
-    if (now - g_lastTelemTime < TELEM_INTERVAL_MS) return;
+
+    // Taxa adaptativa: alta durante o movimento (analise de pico/rampa/corte),
+    // baixa em repouso (so para o dashboard nao congelar).
+    bool emMovimento = (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA);
+    uint32_t intervalo = emMovimento ? TELEM_INTERVAL_MOV_MS : TELEM_INTERVAL_IDLE_MS;
+    if (now - g_lastTelemTime < intervalo) return;
     g_lastTelemTime = now;
 
     // Lê valores atuais dos sensores
@@ -379,7 +384,11 @@ void enviarTelemetria(uint32_t now) {
 // Serializa o mesmo pacote em JSON e envia ao gateway ESP32-S3.
 void enviarTelemEspNow(uint32_t now) {
     if (!g_espnowOk) return;
-    if (now - g_lastEspnowTelem < (1000 / ESPNOW_TELEM_HZ)) return;
+    // Mesma taxa adaptativa da telemetria WebSocket (20 Hz em movimento,
+    // 2 Hz em repouso).
+    bool emMovimento = (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA);
+    uint32_t intervalo = emMovimento ? TELEM_INTERVAL_MOV_MS : TELEM_INTERVAL_IDLE_MS;
+    if (now - g_lastEspnowTelem < intervalo) return;
     g_lastEspnowTelem = now;
 
     float rpm1 = encoders.getRPM1();

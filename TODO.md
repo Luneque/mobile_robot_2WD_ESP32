@@ -63,9 +63,12 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
    - A calibração depende de testes manuais em solo, com risco de teste contaminado (aconteceu: o teste com antecipação 0,7° foi descartado porque o robô não estava no solo).
    - Ausência de CI (`.github/workflows` não existe).
 
-7. **Telemetria de 5 Hz é pouco para análise dinâmica.**
-   - `TELEM_INTERVAL_MS = 200`. O gravador em RAM (20 Hz) cobre a análise, mas o dashboard e o logger em tempo real continuam a 5 Hz.
-   - Subir a taxa via WebSocket pode saturar o loop de controle.
+7. ~~**Telemetria de 5 Hz é pouco para análise dinâmica.**~~ **ATENDIDO (16/11/2026).**
+   - Implementada **telemetria adaptativa**: 20 Hz durante `RETA`/`PIVO`, 2 Hz em `AGUARDO`/`CONCLUIDO` (WebSocket e ESP-NOW).
+   - Medido em bancada: **20,1 Hz em movimento, 2,2 Hz em repouso** (alvos 20/2 Hz).
+   - Validação do impacto no controle: pivôs com desvio 0,40° → **0,21°** e amplitude 1,09° → **0,58°**; RPM 58,8 → 57,9; tempo de reta 3,70 → 3,80 s. Controle não degradou.
+   - O gravador em RAM (20 Hz) já cobria a análise profunda; o ganho está no dashboard/logger em tempo real (~76 amostras por reta, contra ~19 antes).
+   - Risco residual: o envio WebSocket é bloqueante; se o número de clientes crescer, o custo por envio multiplica. Com 1 cliente, ~3% do tempo.
 
 ### [P3] Higiene de código e documentação
 

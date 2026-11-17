@@ -215,7 +215,32 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 14. Resumo da Estrutura Atual do Repositório
+### 14. Etapa 14: Telemetria Adaptativa (16/11/2026)
+
+* **Problema:** a telemetria era fixa em 5 Hz (`TELEM_INTERVAL_MS = 200`), insuficiente para análise dinâmica — um pico de RPM numa reta de 3,8 s tinha ~19 amostras. O gravador em RAM (20 Hz) cobria a análise profunda, mas o dashboard e o logger em tempo real continuavam grosseiros.
+* **Risco identificado antes de mexer:** o envio WebSocket é bloqueante e o loop de controle roda a 50 Hz (20 ms). Subir a taxa custa ~1,5 ms por envio; a 20 Hz seriam ~3% do tempo.
+* **Solução — taxa adaptativa:** em vez de taxa fixa, o firmware escolhe pelo estado:
+  * `RETA`/`PIVO`: `TELEM_INTERVAL_MOV_MS = 50` (20 Hz);
+  * `AGUARDO`/`CONCLUIDO`: `TELEM_INTERVAL_IDLE_MS = 500` (2 Hz).
+  * Aplicado ao WebSocket **e** ao ESP-NOW.
+* **Medição em bancada:** 20,1 Hz em movimento, 2,2 Hz em repouso.
+* **Validação do impacto no controle (5 Hz → 20 Hz):**
+
+  | Métrica | 5 Hz | 20 Hz |
+  | :--- | :---: | :---: |
+  | Pico de RPM | 58,8 | 57,9 |
+  | Tempo por reta | 3,70 s | 3,80 s |
+  | Pivô médio | +90,12° | +90,22° |
+  | Desvio dos pivôs | 0,40° | 0,21° |
+  | Amplitude dos pivôs | 1,09° | 0,58° |
+
+  * O controle **não degradou**: a dispersão angular caiu pela metade. A diferença de ~1 RPM e 0,1 s está dentro da variação entre execuções (bateria, piso, posicionamento).
+* **Lição de método:** o dump analisado vem do gravador em RAM (20 Hz), que já era 20 Hz antes — essa comparação **não** mede o efeito da telemetria WebSocket. O que ela prova é a ausência de degradação do controle. A medição direta da taxa (20,1/2,2 Hz) é que valida a telemetria.
+* **Risco residual registrado:** o custo por envio multiplica com o número de clientes conectados; com 1 cliente fica em ~3% do tempo.
+
+---
+
+### 15. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.

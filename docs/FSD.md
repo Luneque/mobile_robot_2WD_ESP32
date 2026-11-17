@@ -170,10 +170,11 @@ stateDiagram-v2
 - **Comandos remotos centralizados:** `start`/`stop`/`pause`/`reset`/`dump` tratados em um único ponto do `loop()` (antes a flag `_newCommand` era consumida por blocos concorrentes, descartando comandos).
 - **`diag_motor_curve` com Wi-Fi:** varredura não-bloqueante, buffer em RAM, página web e comandos `sweep`/`csv`/`clear`.
 - **Robustez:** timeout automático de 5 s desativado quando o Wi-Fi está conectado (o início passa a ser exclusivamente remoto).
+- **Telemetria adaptativa:** 20 Hz durante o movimento e 2 Hz em repouso, no WebSocket e no ESP-NOW. O dashboard e o logger em tempo real passam a enxergar o movimento com ~76 amostras por reta (antes ~19). Medido em bancada: 20,1 Hz em movimento e 2,2 Hz em repouso; pivôs com desvio 0,40° → 0,21° (controle não degradou).
 - **Ferramentas (`robo_monitor/`):** `capturar_dump.py` (serial), `capturar_dump_wifi.py` (WebSocket, com reconexão), modo `--replay` no `robo_ws_logger.py` para converter o dump em CSV, e `gateway_espnow.py` (ponte serial do gateway ESP32-S3, aceita `start`/`stop`/`pause`/`reset`/`dump` e grava CSV).
-- **ESP-NOW implementado no robô (`espnow_link.h`):** telemetria JSON ao gateway ESP32-S3 (5 Hz) e recepção de `start`/`stop`/`pause`/`reset`/`dump`. Compatível com ESP-IDF v4 e v5 (a assinatura do callback de envio mudou no core 3.x). O dump é devolvido pelo canal que recebeu o pedido.
+- **ESP-NOW implementado no robô (`espnow_link.h`):** telemetria JSON ao gateway ESP32-S3 (mesma taxa adaptativa do WebSocket: 20 Hz em movimento, 2 Hz em repouso) e recepção de `start`/`stop`/`pause`/`reset`/`dump`. Compatível com ESP-IDF v4 e v5 (a assinatura do callback de envio mudou no core 3.x). O dump é devolvido pelo canal que recebeu o pedido.
 - **Restrição de canal confirmada em bancada:** o canal efetivo do enlace é o da interface Wi-Fi — com o robô associado a um AP, é o canal do AP (medido: 11). Registrar o peer com canal 1 nesse cenário produzia `Peer channel is not equal to the home channel, send fail!`. O peer agora nasce com canal 0 (canal atual). **Para enlace dedicado, o AP deve operar no canal configurado em `ESPNOW_CHANNEL`** (ou o gateway deve usar o mesmo canal do AP). Com `esp_wifi_set_channel()` após o connect, o robô derruba o Wi-Fi e trava — não usar.
-- **Validação:** boot íntegro, HTTP 80 e WebSocket 81 respondendo, zero erros de envio no log. **Ainda falta validar o enlace de ponta a ponta com o ESP32-S3.**
+- **Validação:** boot íntegro, HTTP 80 e WebSocket 81 respondendo, zero erros de envio no log. **Enlace validado de ponta a ponta** com gateway ESP32 clássico: 1.472 pacotes/40 s, `CMD:start` confirmado e dump com 443 amostras (ver Diário, Etapa 13).
 
 ## 📄 Atualizações Recentes (13/11/2026)
 

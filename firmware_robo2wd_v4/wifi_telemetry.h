@@ -44,9 +44,6 @@
 #ifndef WIFI_CONNECT_TIMEOUT_MS
 #define WIFI_CONNECT_TIMEOUT_MS 10000   // 10 s de timeout na conexão
 #endif
-#ifndef TELEM_INTERVAL_MS
-#define TELEM_INTERVAL_MS       200     // 5 Hz de telemetria
-#endif
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Struct de Telemetria
