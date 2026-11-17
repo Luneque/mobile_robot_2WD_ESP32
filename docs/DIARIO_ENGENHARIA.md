@@ -267,7 +267,21 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 16. Resumo da Estrutura Atual do Repositório
+### 16. Etapa 16: Chart.js Local (17/11/2026)
+
+* **Problema (item 4 do TODO):** o dashboard carregava o Chart.js de CDN (`cdn.jsdelivr.net`). Sem upstream no AP, os gráficos não carregavam — só o mapa 2D (Canvas puro) funcionava.
+* **Solução:** o Chart.js 4.5.1 (UMD minificado) passou a ser servido pelo próprio ESP32.
+  * Novo `chartjs_asset.h` (gerado): o pacote em PROGMEM como array de bytes.
+  * Nova rota HTTP `/chartjs.min.js` com `Content-Type: application/javascript`.
+  * O `<script src>` do dashboard aponta para `/chartjs.min.js`.
+* **Decisão — gzip:** o pacote minificado tem **208 KB**. A partição de app é de 1,25 MB e o sketch já ocupava 1.052 KB (80%), então sobravam ~258 KB. Servir sem compressão deixaria só ~50 KB de folga. Com **gzip** o pacote cai para **70,8 KB**, sobrando ~188 KB. A rota responde `Content-Encoding: gzip` e o browser descomprime.
+  * Alternativa recusada: SPIFFS/LittleFS — exigiria formatar e manter um filesystem, mais peças móveis para o mesmo resultado.
+* **Custo de build:** o header gerado tem 365 KB de fonte (70,8 KB de dados), o que **aumentou o tempo de compilação** de ~40 s para ~4 min. É o preço de embutir o asset; o tempo de execução não é afetado.
+* **Licença:** Chart.js é MIT; o aviso de licença está no header gerado.
+
+---
+
+### 17. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.

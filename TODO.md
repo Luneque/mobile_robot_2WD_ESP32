@@ -50,9 +50,10 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 
 ### [P2] Robustez e qualidade
 
-4. **Dashboard depende de internet (Chart.js via CDN).**
-   - `wifi_telemetry.h:80`: `<script src="https://cdn.jsdelivr.net/npm/chart.js">`.
-   - Se o AP não tiver upstream, os gráficos não carregam (o mapa 2D, que é Canvas puro, continua funcionando).
+4. ~~**Dashboard depende de internet (Chart.js via CDN).**~~ **ATENDIDO (17/11/2026).**
+   - O Chart.js 4.5.1 (UMD min) passou a ser servido pelo próprio ESP32 em `/chartjs.min.js`; o dashboard não depende mais de CDN nem de upstream do AP.
+   - Ativo: `chartjs_asset.h` (gerado, 365 KB de fonte) com o pacote **gzip** (70,8 KB em vez de 208 KB) em PROGMEM; a rota responde `Content-Type: application/javascript` + `Content-Encoding: gzip`.
+   - Compressão foi necessária porque o app está em 80% da flash (1,25 MB de partição): sem gzip o pacote custaria 208 KB e deixaria só ~50 KB de folga.
 
 5. ~~**Mapa 2D usa ângulos nominais por lado.**~~ **ATENDIDO (17/11/2026).**
    - Removido o `baseDeg` nominal por lado. O mapa agora integra o **rumo global real** (`g_yawAbs`), acumulado do yaw da IMU e ancorado no `start`.
@@ -136,7 +137,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 
 1. ~~**[P1]** Decidir o destino do ESP-NOW~~ — **atendido**: implementado o lado do robô (`espnow_link.h`) + ponte `gateway_espnow.py`. Resta validar com o ESP32-S3 e, se desejado, trocar broadcast por MAC dedicado.
 2. **[P1]** Monitor de bateria (hardware + `PIN_BATTERY_ADC` + alerta/telemetria).
-3. **[P2]** Chart.js local (baixar o arquivo para PROGMEM ou servir do SPIFFS).
+3. ~~**[P2]** Chart.js local (baixar o arquivo para PROGMEM ou servir do SPIFFS).~~ **ATENDIDO (17/11/2026)** — servido de `/chartjs.min.js` pelo próprio ESP32 (gzip em PROGMEM).
 4. ~~**[P2]** Mapa 2D com orientação real medida (remover `baseDeg` nominal).~~ **ATENDIDO (17/11/2026)** — ver item 5 dos problemas de fundo.
 5. **[P2]** Testes automatizados: ao menos um teste de regressão da interpolação da curva e do critério de corte do pivô, com CI.
 6. **[P3]** Higiene: comentários do `config.h`, remover `IMU_HABILITADA`, atualizar FSD:27 e a seção 5 do Manual, `secrets.h.example` para o `diag_motor_curve`.

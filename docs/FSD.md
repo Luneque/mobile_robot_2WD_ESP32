@@ -181,3 +181,9 @@ stateDiagram-v2
 - **Firmware:** odometria recalibrada para roda de 66 mm (10.417 ticks por reta de 500 mm); corte de pivô por delta real de yaw (`g_yawStartSeg`) com guarda de 200 ticks; `K_SYNC = 0.15` e `IMU_KP_YAW_RETA = 2.0`; limite de PWM ±50 µs; giro pivô suavizado para 35 RPM.
 - **Dashboard Web:** mapa 2D com quadrado ideal (500 mm), rastro real por odometria cumulativa, pose (X, Y, θ) e seta de direção. O rastro usa o **rumo global real** integrado do yaw da IMU (`yawAbs`), não ângulos nominais por lado — o desvio angular medido aparece no traçado.
 - **Documentação:** README, Diário de Engenharia, FSD e Manual Técnico consolidados com os valores vigentes.
+
+## 📄 Atualizações Recentes (17/11/2026)
+
+- **Dashboard 100% local:** o Chart.js 4.5.1 (UMD min) passou a ser servido pelo próprio ESP32 em `/chartjs.min.js`, em PROGMEM e **gzip** (70,8 KB em vez de 208 KB). O dashboard não depende mais de CDN nem de upstream do AP — os gráficos carregam mesmo com o AP sem internet.
+- **Mapa 2D com orientação real:** o rastro usa o rumo global integrado do yaw da IMU (`yawAbs`), ancorado no `start`. O erro angular real deixou de ser mascarado por ângulos nominais por lado. Referência ideal anti-horária: (500,0)→(500,500)→(0,500)→(0,0).
+- **Gravador:** 1984 amostras (99,2 s) — o campo `yawAbs` aumentou a `RecSample` de 32 para 36 bytes. Nova coluna `yaw_abs_deg` no CSV.

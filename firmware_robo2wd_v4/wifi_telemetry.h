@@ -28,6 +28,7 @@
 #include <ArduinoJson.h>
 
 #include "secrets.h"   // WIFI_SSID, WIFI_PASSWORD
+#include "chartjs_asset.h"   // Chart.js 4.5.1 gz (servido em /chartjs.min.js)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configurações com valores padrão (podem ser sobreescritas via config.h)
@@ -75,7 +76,7 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Robô 2WD — Telemetria V4</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/chartjs.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI',sans-serif;padding:16px}
@@ -461,6 +462,12 @@ public:
         // Registra handler HTTP para "/"
         _http.on("/", [this]() {
             _http.send_P(200, "text/html", DASHBOARD_HTML);
+        });
+        // Chart.js servido localmente (gzip). O dashboard nao depende de CDN.
+        _http.on("/chartjs.min.js", [this]() {
+            _http.sendHeader("Content-Encoding", "gzip");
+            _http.send_P(200, "application/javascript",
+                         (PGM_P)CHARTJS_GZ, CHARTJS_GZ_LEN);
         });
         _http.begin();
         Serial.print(F("[HTTP] Servidor na porta "));
