@@ -302,7 +302,29 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 18. Resumo da Estrutura Atual do Repositório
+### 18. Etapa 18: Validação do Refactor de Cinemática e a Calibração do Giroscópio (17/11/2026)
+
+* **Objetivo:** confirmar em solo que a extração de `ticksParaMm()`/`ticksParaArcoPivo()` para `robo_matematica.h` (Etapa 17) não mudou o comportamento.
+* **Resultado direto no robô:** o dump grava `ticks_alvo`, que é a saída das funções extraídas. Nos dois testes, `RETA = 10417` e `PIVO = 1963` — **idêntico**. As distâncias reais das retas (503 mm) e os ângulos de pivô (~90°) também coincidiram.
+* **Primeira rodada (boot contaminado):** fechamento de **337 mm**, com deriva de **~13° por reta**. O indício: a assimetria de ticks **inverteu de sinal** (de −55 para +146) e o PWM médio caiu de 1710 para 1686 µs com o RPM subindo de 54,5 para 62 — coerente com a bateria nova, mas não explicava a inversão.
+* **Causa-raiz:** o robô havia reiniciado e a bateria fora trocada. A calibração do giroscópio (`imu.calibrateGyro(150)`) roda **no boot** — com o corpo em movimento, o bias resultante faz o controlador "acreditar" que está girando. O refactor foi descartado como causa.
+* **Segunda rodada (boot com o robô parado), mesmo firmware:**
+
+  | Métrica | Bateria anterior | Boot contaminado | **Recalibrado** |
+  | :--- | :---: | :---: | :---: |
+  | Deriva por reta | −0,4 a −1,4° | −12 a −14° | **+0,15 a −0,88°** |
+  | Erro por lado | 13/20/18/14 mm | 70/203/302/337 mm | **5/9/10/5 mm** |
+  | Fechamento | 14 mm | 337 mm | **5 mm** |
+  | Pico de RPM | 54,5 | 62,1 | 60,4 |
+  | Pivôs | 90,20° ± 0,46 | 90,05° ± 0,63 | 90,40° ± 0,50 |
+
+* **Conclusão:** o refactor é behavior-identical e o **melhor resultado do projeto foi obtido com ele** (5 mm de fechamento, contra 14 mm do teste anterior).
+* **Requisito operacional novo:** o robô deve ser ligado com o **corpo parado** e não pode ser tocado nos primeiros segundos (boot + calibração + Wi-Fi + armamento do ESC). Isso passa a ser pré-requisito de qualquer teste em solo.
+* **Efeito colateral observado:** a bateria nova eleva o RPM de cruzeiro de ~54,5 para ~60,4. O `VELOCIDADE_CRUZEIRO_RPM` continua 55 e o feedforward compensa — a trajetória segue precisa, mas vale monitorar.
+
+---
+
+### 19. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.

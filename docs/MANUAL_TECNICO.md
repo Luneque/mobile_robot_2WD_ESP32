@@ -112,16 +112,20 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 ## 5. Guia Rápido de Operação e Comandos (Versão 4)
 
 ### 5.1 Operação Sem Fio pelo Navegador (Recomendado)
+
+> **Requisito de boot:** o robô deve ser ligado com o **corpo parado** e não pode ser tocado nos primeiros segundos. A calibração do giroscópio (`imu.calibrateGyro`) roda na inicialização; se o corpo se mover nessa janela, o bias resultante faz o controlador "acreditar" que está girando — foi observado um boot contaminado que produziu deriva de ~13° por reta e fechamento de 337 mm (contra 5 mm com o boot parado, mesmo firmware).
+
 1. Ligue a alimentação dos motores e do ESP32 na bateria.
-2. O robô se conectará automaticamente à rede Wi-Fi configurada (`secrets.h`).
-3. No PC ou celular na mesma rede, abra:
+2. **Aguarde o boot sem tocar no robô** (~10 s: calibração → Wi-Fi → armamento do ESC).
+3. O robô se conectará automaticamente à rede Wi-Fi configurada (`secrets.h`).
+4. No PC ou celular na mesma rede, abra:
    * **`http://robo.local/`** (ou o IP atribuído, ex: `http://192.168.1.102/`).
-4. O painel exibirá:
-   * **Mapa 2D da Trajetória:** Sobreposição do quadrado ideal de 500×500 mm (azul tracejado) com o rastro real do robô (verde contínuo), marcador do robô e vetor de direção atualizados a cada 200 ms. Inclui coordenadas instantâneas $(X, Y)$ em mm e ângulo $\theta$ em graus, além de botão para reset manual do rastro.
+5. O painel exibirá:
+   * **Mapa 2D da Trajetória:** Sobreposição do quadrado ideal de 500×500 mm (azul tracejado) com o rastro real do robô (verde contínuo), marcador do robô e vetor de direção atualizados em tempo real (20 Hz no movimento). Inclui coordenadas instantâneas $(X, Y)$ em mm e ângulo $\theta$ em graus, além de botão para reset manual do rastro.
    * **Gráficos em Tempo Real:** RPM (Esquerda/Direita), Yaw (graus) e pulsos de PWM ($\mu\text{s}$).
-5. Posicione o robô no solo e clique no botão verde **START** para iniciar a trajetória quadrada.
-6. A qualquer momento, envie comando de parada remota pelo painel para interromper o movimento.
-7. Ao término, clique em **DOWNLOAD CSV** no dashboard para salvar o registro completo dos dados da corrida.
+6. Posicione o robô no solo e clique no botão verde **START** para iniciar a trajetória quadrada.
+7. A qualquer momento, envie comando de parada remota pelo painel para interromper o movimento.
+8. Ao término, clique em **DOWNLOAD CSV** no dashboard para salvar o registro completo dos dados da corrida.
 
 ### 5.2 Operação Local via Cabo Serial (Fallback de Bancada)
 1. Conecte o robô via USB (`COM9`) e abra o monitor serial em **115200 baud**.
