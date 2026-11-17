@@ -43,6 +43,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 2. **Monitor de bateria não implementado.**
    - `PIN_BATTERY_ADC = -1` (desabilitado) e nenhuma leitura de tensão no firmware.
    - Sem proteção contra LiPo 2S profunda: risco real de dano à bateria e de o robô parar no meio do percurso.
+   - **Adiado por decisão do usuário (16/11/2026).** Projeto já levantado: divisor R1=100k/R2=47k em GPIO 34 (ADC1_CH6), `ADC_11db`, fundo de escala ~2,5 V, limiares 7,0 V (atenção) / 6,6 V (corte, 3,30 V/célula), telemetria `vbat` + corte em `ESTADO_EMERGENCIA`. Pendência: divisor não está montado; calibração com multímetro é obrigatória.
 
 3. **Sem proteção de baixa tensão / sem telemetria de corrente.**
    - Relacionado ao item anterior. O ESC é brushless de 2-3S; operar abaixo de ~6,4 V danifica a célula.
