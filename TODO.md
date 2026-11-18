@@ -146,7 +146,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 4. ~~**[P2]** Mapa 2D com orientação real medida (remover `baseDeg` nominal).~~ **ATENDIDO (17/11/2026)** — ver item 5 dos problemas de fundo.
 5. ~~**[P2]** Testes automatizados: ao menos um teste de regressão da interpolação da curva e do critério de corte do pivô, com CI.~~ **ATENDIDO (17/11/2026)** — CI criada; 29 testes nativos (incluindo o critério de corte do pivô) e 11 Python passando.
 6. ~~**[P3]** Higiene: comentários do `config.h`, remover `IMU_HABILITADA`, atualizar FSD:27 e a seção 5 do Manual, `secrets.h.example` para o `diag_motor_curve`.~~ **ATENDIDO (18/11/2026)** — ver itens 8–15 da seção [P3].
-7. **[P3]** Decidir o destino de `diag_motor_curve/gráfico.png`.
+7. ~~**[P3]** Decidir o destino de `diag_motor_curve/gráfico.png`.~~ **SEM OBJETO (18/11/2026)** — o arquivo não existe mais no disco.
 
 ---
 
