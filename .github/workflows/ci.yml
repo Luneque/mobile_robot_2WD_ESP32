@@ -10,9 +10,9 @@ jobs:
     name: Testes (Python + nativo)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -29,14 +29,14 @@ jobs:
     name: Compilação do firmware (esp32)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # O firmware precisa de secrets.h (SSID/senha), que fica fora do git.
       - name: Prepara secrets.h
         run: cp firmware_robo2wd_v4/secrets.h.example firmware_robo2wd_v4/secrets.h
 
       - name: Compila firmware do robô e do gateway
-        uses: arduino/compile-sketches@v1
+        uses: arduino/compile-sketches@v1.1.4
         with:
           fqbn: esp32:esp32:esp32
           platforms: |
