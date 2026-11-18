@@ -267,8 +267,8 @@ void processarControleMovimento(uint32_t now) {
             sync_corr += yawError * IMU_KP_YAW_RETA;
         }
 
-        if (sync_corr > 50.0f) sync_corr = 50.0f;
-        if (sync_corr < -50.0f) sync_corr = -50.0f;
+        if (sync_corr > SYNC_CLAMP_US) sync_corr = SYNC_CLAMP_US;
+        if (sync_corr < -SYNC_CLAMP_US) sync_corr = -SYNC_CLAMP_US;
 
         out1 -= sync_corr;
         out2 += sync_corr;

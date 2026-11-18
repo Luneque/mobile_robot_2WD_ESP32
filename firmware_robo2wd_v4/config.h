@@ -73,6 +73,9 @@
 // 4.1 FUSÃO SENSORIAL E CONTROLE ANGULAR COM IMU (BMI160)
 // ==========================================
 #define IMU_KP_YAW_RETA    2.0f     // Reforçado de 1.2 para 2.0 para eliminar desvios angulares em retas com perturbação no solo
+// Clampe da correção de sincronismo cruzado (µs) aplicada ao PWM de cada motor.
+// Valor original era literal no loop; virou macro para ficar visível/configurável.
+#define SYNC_CLAMP_US      50.0f
 #define CONTROL_LOOP_MS    20       // Período de amostragem do loop de controle (20ms = 50Hz)
 
 // ==========================================
