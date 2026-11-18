@@ -378,7 +378,28 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 22. Resumo da Estrutura Atual do Repositório
+### 22. Etapa 22: Tentativa de Aumentar o Ganho de Yaw (18/11/2026)
+
+* **Objetivo:** ver se mais autoridade na correção de yaw melhora a precisão. O clampe (±50 µs) estava sendo usado em ~22 µs, havendo margem.
+* **Variante:** `IMU_KP_YAW_RETA` 2,0 → 3,5 e clampe 50 → 80 µs (a macro `SYNC_CLAMP_US` foi criada nessa ocasião).
+
+  | Métrica | kp = 2,0 | kp = 3,5 |
+  | :--- | :---: | :---: |
+  | Desvio de direção por lado | +0,32 / +0,08 / +0,55 / +1,21° | +1,11 / +0,61 / −0,83 / +0,73° |
+  | \|desvio\| médio | **0,54°** | 0,82° |
+  | Comprimento dos lados | 503/500/503/499 (amp. 4 mm) | 503/494/497/511 (amp. 17 mm) |
+  | \|deriva\| média | 0,69° | **0,48°** |
+  | Oscilação do yaw (σ) | 0,57 | **0,36** |
+  | Direção final | −0,83° | **+0,40°** |
+  | Soma \|erros/lado\| | **22 mm** | 39 mm |
+
+* **Resultado: negativo.** O ganho maior deixou o controle mais rígido (menos oscilação, deriva mais uniforme, melhor direção final), mas **piorou a forma do quadrado** — maior desvio de direção por lado e lados menos uniformes. Com n=1, a diferença é pequena, mas não há evidência de ganho.
+* **Decisão:** mantido `IMU_KP_YAW_RETA = 2.0` e clampe 50 µs. A macro `SYNC_CLAMP_US` permanece (higiene, comportamento idêntico — binário com o mesmo tamanho).
+* **Conclusão mais ampla:** entre remover a correção (piora muito: 22 → 81–114 mm) e aumentá-la (não melora), o valor vigente está num ponto razoável. **O limite atual é mecânico**, não de ganho de controle.
+
+---
+
+### 23. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.
