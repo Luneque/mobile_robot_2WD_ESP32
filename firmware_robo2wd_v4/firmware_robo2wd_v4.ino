@@ -209,24 +209,11 @@ void processarControleMovimento(uint32_t now) {
     float yawError = deltaYaw;                      // erro relativo ao início do segmento
     float yawAbs   = fabsf(deltaYaw);               // magnitude real da rotação executada
 
-    // 1. Critério de Parada
-    bool atingiuMeta = false;
-    if (g_emLinhaReta) {
-        // Na reta, o critério primário é a distância por encoders
-        atingiuMeta = (avgTicks >= g_targetTicks);
-    } else {
-        // Na curva pivô, se a IMU estiver ativa, ela é a autoridade máxima do ângulo de 90°
-        if (imu.isInitialized()) {
-            // Guarda mínimo de ticks reais de encoder antes de aceitar o delta de yaw da IMU.
-            const int32_t MIN_TICKS_PIVO = 200; // ~9.6mm de arco = confirmação de movimento real
-            bool movimentoConfirmado = (avgTicks >= MIN_TICKS_PIVO);
-            // Parada antecipada para acomodar a inércia de frenagem (PIVO_ANTECIPACAO_GRAUS)
-            atingiuMeta = movimentoConfirmado &&
-                          ((yawAbs >= (g_anguloTotalGraus - PIVO_ANTECIPACAO_GRAUS)) || (avgTicks >= (int32_t)(g_targetTicks * 1.15f)));
-        } else {
-            atingiuMeta = (avgTicks >= g_targetTicks);
-        }
-    }
+    // 1. Critério de Parada (robo_matematica.h)
+    bool atingiuMeta = g_emLinhaReta
+        ? atingiuMetaReta(avgTicks, g_targetTicks)
+        : atingiuMetaPivo(avgTicks, yawAbs, g_targetTicks, g_anguloTotalGraus,
+                          imu.isInitialized());
 
     if (atingiuMeta) {
         motors.stopAll();

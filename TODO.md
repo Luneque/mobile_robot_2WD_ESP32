@@ -71,6 +71,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
    - **CI:** `.github/workflows/ci.yml` com dois jobs — `testes` (Python + nativo) e `build` (compila o firmware do robô e o gateway via `arduino/compile-sketches`).
    - Para viabilizar os testes nativos, `ticksParaMm()` e `ticksParaArcoPivo()` foram extraídas para `firmware_robo2wd_v4/robo_matematica.h` — **as fórmulas são idênticas** e o binário resultante tem o mesmo tamanho (1.123.859 bytes).
    - **O que falta para fechar o item:** testes do critério de corte do pivô (extrair `atingiuMetaPivo()`), do perfil trapezoidal e do `yawParaRumo()` do dashboard (JS). Os dois últimos exigem mais refactor; o do pivô é o mais valioso e o mais sensível (mexe no laço de controle).
+   - **Atualização (17/11/2026):** `tests/native/test_pivo.cpp` criado — **17 testes** do critério de parada (guarda de 200 ticks, antecipação de 0,7°, fallback 1,15×, modo sem IMU e reta), incluindo **fixtures reais** dos quatro pivôs medidos no solo. `atingiuMetaReta()`/`atingiuMetaPivo()` extraídas para `robo_matematica.h`, com as expressões idênticas. Total: **29 testes nativos**.
 
 7. ~~**Telemetria de 5 Hz é pouco para análise dinâmica.**~~ **ATENDIDO (16/11/2026).**
    - Implementada **telemetria adaptativa**: 20 Hz durante `RETA`/`PIVO`, 2 Hz em `AGUARDO`/`CONCLUIDO` (WebSocket e ESP-NOW).
@@ -143,7 +144,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 2. **[P1]** Monitor de bateria (hardware + `PIN_BATTERY_ADC` + alerta/telemetria).
 3. ~~**[P2]** Chart.js local (baixar o arquivo para PROGMEM ou servir do SPIFFS).~~ **ATENDIDO (17/11/2026)** — servido de `/chartjs.min.js` pelo próprio ESP32 (gzip em PROGMEM).
 4. ~~**[P2]** Mapa 2D com orientação real medida (remover `baseDeg` nominal).~~ **ATENDIDO (17/11/2026)** — ver item 5 dos problemas de fundo.
-5. ~~**[P2]** Testes automatizados: ao menos um teste de regressão da interpolação da curva e do critério de corte do pivô, com CI.~~ **PARCIALMENTE ATENDIDO (17/11/2026)** — CI criada e testes da curva/cinemática/ferramentas passando; falta o teste do critério de corte do pivô.
+5. ~~**[P2]** Testes automatizados: ao menos um teste de regressão da interpolação da curva e do critério de corte do pivô, com CI.~~ **ATENDIDO (17/11/2026)** — CI criada; 29 testes nativos (incluindo o critério de corte do pivô) e 11 Python passando.
 6. **[P3]** Higiene: comentários do `config.h`, remover `IMU_HABILITADA`, atualizar FSD:27 e a seção 5 do Manual, `secrets.h.example` para o `diag_motor_curve`.
 7. **[P3]** Decidir o destino de `diag_motor_curve/gráfico.png`.
 

@@ -22,4 +22,30 @@ static inline int32_t ticksParaArcoPivo(float anguloGraus) {
     return (int32_t)(arco_mm / MM_POR_PULSO);
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Criterios de parada dos segmentos.
+//
+// Extraidos de processarControleMovimento() para serem testaveis fora do
+// microcontrolador (tests/native/test_pivo.cpp) — as expressoes sao
+// exatamente as mesmas.
+// ────────────────────────────────────────────────────────────────────────────
+
+// Reta: a distancia medida pelos encoders e o criterio primario.
+static inline bool atingiuMetaReta(int32_t avgTicks, int32_t targetTicks) {
+    return avgTicks >= targetTicks;
+}
+
+// Pivo: com IMU ativa ela e a autoridade do angulo, mas a odometria precisa
+// confirmar movimento (guarda MIN_TICKS_PIVO) e serve de rede de seguranca
+// (fallback PIVO_FALLBACK_FATOR) caso a IMU falhe. Sem IMU, para por ticks.
+static inline bool atingiuMetaPivo(int32_t avgTicks, float yawAbs,
+                                   int32_t targetTicks, float anguloTotalGraus,
+                                   bool imuAtiva) {
+    if (!imuAtiva) return avgTicks >= targetTicks;
+    bool movimentoConfirmado = (avgTicks >= MIN_TICKS_PIVO);
+    return movimentoConfirmado &&
+           ((yawAbs >= (anguloTotalGraus - PIVO_ANTECIPACAO_GRAUS)) ||
+            (avgTicks >= (int32_t)(targetTicks * PIVO_FALLBACK_FATOR)));
+}
+
 #endif

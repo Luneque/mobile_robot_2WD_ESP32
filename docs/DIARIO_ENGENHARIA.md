@@ -324,7 +324,24 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 19. Resumo da Estrutura Atual do Repositório
+### 19. Etapa 19: Teste do Critério de Corte do Pivô (17/11/2026)
+
+* **Objetivo:** travar os três mecanismos do critério de parada do pivô, que até então só existiam inline no laço de controle — calibrados por tentativa e erro e invisíveis a regressão.
+* **Extração:** `atingiuMetaReta()` e `atingiuMetaPivo()` em `robo_matematica.h`, com as expressões idênticas. As constantes `MIN_TICKS_PIVO` (200) e `PIVO_FALLBACK_FATOR` (1,15) saíram do corpo da função para `config.h`, onde ficam visíveis e testáveis. O `.ino` passou a usar uma única expressão ternária.
+* **Cobertura — 17 testes:**
+  * **Guarda de 200 ticks**: 150 e 199 ticks não param, mesmo com yaw de 89,9° e 95,0°; 200 ticks com 89,3° para.
+  * **Antecipação de 0,7°**: corta em 89,30°; 89,29° não corta.
+  * **Fallback 1,15× (2257 ticks)**: para com yaw de 80°; 2256 não para. É a rede de segurança contra giro infinito se a IMU falhar.
+  * **Sem IMU**: para por ticks (1963 sim, 1962 não).
+  * **Reta**: 10417 sim, 10416 não.
+  * **Fixtures reais** dos quatro pivôs medidos no solo (1969/89,79°, 1973/90,41°, 1988/91,17°, 1983/90,24°) — todos disparam, e verifica-se que **não disparariam antes** do ponto observado. É o teste de caracterização: amarra o comportamento medido em vez de um valor inventado.
+* **Ferramenta:** `tests/native/rodar.py` passou a compilar e rodar cada teste como executável separado (dois arquivos com `main` não linkam juntos).
+* **Validação:** 29 testes nativos (12 de cinemática + 17 de pivô) e 11 Python, todos passando. Firmware compila com 1.123.839 bytes (85%) — 20 bytes a menos que antes da extração.
+* **O que o teste NÃO cobre:** se 0,7° é a antecipação *ideal*. Ele garante que o critério faz o que está escrito; a calibração continua sendo validada em solo.
+
+---
+
+### 20. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.

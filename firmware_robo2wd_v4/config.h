@@ -90,6 +90,14 @@
 // Teste com 0.2° deu 90.71° -> subir para 0.7° para aproximar de 90.0°.
 #define PIVO_ANTECIPACAO_GRAUS 0.7f
 
+// Guarda mínima de ticks do pivô: só aceita o yaw da IMU depois que a
+// odometria confirma movimento real (~9,6 mm de arco), evitando cortar por
+// um pico de yaw antes de o robô sair do lugar.
+#define MIN_TICKS_PIVO         200
+// Rede de segurança do pivô: se a IMU falhar/travar, para por odometria
+// quando as ticks atingem este fator do alvo (evita giro infinito).
+#define PIVO_FALLBACK_FATOR    1.15f
+
 #define VELOCIDADE_CRUZEIRO_RPM 55.0f // Velocidade de cruzeiro dinamica ideal (~190 mm/s alvo, ~40 RPM real com momento estavel)
 #define VELOCIDADE_MIN_RPM      20.0f // Velocidade mínima de rampa (para não estolar)
 #define VELOCIDADE_GIRO_RPM     35.0f // Velocidade alvo para curvas em pivô central suavizado (evita overshoot por inércia)

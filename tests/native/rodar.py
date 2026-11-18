@@ -23,7 +23,7 @@ import tempfile
 RAIZ = pathlib.Path(__file__).resolve().parents[2]
 NATIVO = pathlib.Path(__file__).resolve().parent
 FW = RAIZ / "firmware_robo2wd_v4"
-TESTES = ["test_cinematica.cpp"]
+TESTES = ["test_cinematica.cpp", "test_pivo.cpp"]
 
 
 def encontrar_compilador():
@@ -47,22 +47,33 @@ def main():
         print("instale g++, clang++ ou rode: pip install ziglang")
         return 1
 
+    falhas = 0
     with tempfile.TemporaryDirectory() as tmp:
-        exe = pathlib.Path(tmp) / "testes.exe"
-        cmd = cc + [
-            "-O1", "-std=c++17", "-Wall",
-            "-I", str(NATIVO),
-            "-I", str(FW),
-        ] + [str(NATIVO / t) for t in TESTES] + ["-o", str(exe)]
+        for teste in TESTES:
+            exe = pathlib.Path(tmp) / (pathlib.Path(teste).stem + ".exe")
+            cmd = cc + [
+                "-O1", "-std=c++17", "-Wall",
+                "-I", str(NATIVO),
+                "-I", str(FW),
+                str(NATIVO / teste),
+                "-o", str(exe),
+            ]
+            print(f"\n[compilando] {teste}")
+            r = subprocess.run(cmd)
+            if r.returncode != 0:
+                print("FALHA na compilacao")
+                falhas += 1
+                continue
+            r = subprocess.run([str(exe)])
+            if r.returncode != 0:
+                falhas += 1
 
-        print(f"[compilando] {' '.join(cmd)}")
-        r = subprocess.run(cmd)
-        if r.returncode != 0:
-            print("FALHA na compilacao dos testes")
-            return r.returncode
-
-        r = subprocess.run([str(exe)])
-        return r.returncode
+    print()
+    if falhas:
+        print(f"FALHA: {falhas} teste(s) com problema")
+        return 1
+    print("Todos os testes nativos passaram")
+    return 0
 
 
 if __name__ == "__main__":
