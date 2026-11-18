@@ -7,11 +7,11 @@
 > `README.md`, `docs/FSD.md` e `docs/MANUAL_TECNICO.md` para o estado atual.
 
 ## Materiais
- - Chassi Circular (foto2.png)
+ - Chassi Circular
  - 2 Rodas
- - 2 Motores DC com Encoder (foto4.png)
- - ESP32 WROOM32 com Placa de Expansão (foto1.png)
- - ESC para Motor Escovado 2 Canais (foto3.png)
+ - 2 Motores DC com Encoder
+ - ESP32 WROOM32 com Placa de Expansão
+ - ESC para Motor Escovado 2 Canais
 ---
 
 ## Informações Extras
