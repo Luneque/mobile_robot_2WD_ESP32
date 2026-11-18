@@ -341,7 +341,25 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 20. Resumo da Estrutura Atual do Repositório
+### 20. Etapa 20: Validação em Solo do Refactor do Critério de Corte (17/11/2026)
+
+* **Objetivo:** confirmar que a extração de `atingiuMetaReta()`/`atingiuMetaPivo()` para `robo_matematica.h` não alterou o comportamento do pivô.
+* **Método:** três execuções do quadrado no solo, com boot parado, comparando pivôs, fechamento e deriva.
+* **Resultado:**
+
+  | Execução | Fechamento | Erros/lado | Pivô médio | Desvio | Ticks no corte | RPM |
+  | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+  | 1ª (bateria nova) | 5 mm | 5/9/10/5 | +90,40° | 0,50 | 1978 | 60,4 |
+  | 2ª (pós-refactor) | 16 mm | 12/21/17/16 | +89,98° | 0,39 | 1951 | 59,6 |
+  | 3ª | 9 mm | 7/12/12/9 | +90,31° | **0,20** | 1984 | 60,5 |
+
+* **Conclusão:** o **pivô é estável** — média de 90,23° com amplitude de apenas **0,43°** nas três execuções, e a 3ª apresentou o menor desvio. O fechamento varia de 5 a 16 mm conforme a **deriva nas retas** (−0,15 a −0,88°), que é o fator dominante e não tem relação com o critério de corte. A 2ª execução era a ponta alta da dispersão natural.
+* **Granularidade:** o corte é verificado a 50 Hz com o robô girando a ~56°/s, logo a resolução é de ~1,1° por iteração — a diferença observada (0,43°) está dentro de um quantum do laço.
+* **Fechamento do item 5 do TODO:** 29 testes nativos + 11 Python, CI configurada e firmware validado em solo.
+
+---
+
+### 21. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.
