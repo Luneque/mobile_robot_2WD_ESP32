@@ -24,7 +24,7 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 1. **Periférico PCNT (Pulse Counter):** Decodifica por hardware a quadratura 4x dos encoders com filtros digitais anti-ruído (*glitch filters* de 1000 ns), eliminando qualquer sobrecarga de CPU.
 2. **Periférico MCPWM (Motor Control PWM):** Gera pulsos de controle para o ESC a 50 Hz com resolução de $1\,\mu\text{s}$ via timer dedicado de 1 MHz.
 3. **Máquina de Estados Não-Bloqueante (FSM):** Toda a lógica opera orientada a tempo no `loop()`, permitindo integração com sensores futuros e comunicação sem loops de espera com `delay()`.
-4. **Perfil de Velocidade Trapezoidal:** Rampas progressivas de aceleração (50 mm) e desaceleração (60 mm), eliminando derrapagens (*wheel slip*) e permitindo velocidade de cruzeiro alvo de **55 RPM** ($\approx 190\text{ mm/s}$ nominal; ~40 RPM real em solo).
+4. **Perfil de Velocidade Trapezoidal:** Rampas progressivas de aceleração (50 mm) e desaceleração (60 mm), eliminando derrapagens (*wheel slip*) e permitindo velocidade de cruzeiro alvo de **55 RPM** ($\approx 190\text{ mm/s}$; medido no solo: pico de ~60 RPM com bateria 2S).
 5. **Segurança Ativa e Hardware Watchdog:**
    * Detecção de desbalanceamento e stall em retas e curvas pivô.
    * Task Watchdog Timer do ESP32 (`esp_task_wdt`) ativo e reconfigurado para 5 segundos.
@@ -122,7 +122,6 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | **Ganho de Sincronismo** | `K_SYNC` | `0.15f` | Trava o avanço relativo entre rodas |
 | **Timeout do Watchdog** | `WDT_TIMEOUT_SECONDS` | `5` | Reinício automático em caso de travamento (ajustado para Wi-Fi) |
 | **Pausa de Estabilização** | `PAUSA_ENTRE_MOVIMENTOS_MS` | `800` | Dissipação de inércia residual |
-| **Zona Morta ESC** | `ESC_DEADBAND_US` | `110.0f` | Zona morta medida (~100 µs); piso do feedforward |
 | **Fator de Carga do Feedforward** | `CURVA_FATOR_CARGA` | `0.80f` | Corrige a curva PWM×RPM para a carga do robô no solo |
 | **Ganho de Yaw em Reta** | `IMU_KP_YAW_RETA` | `2.0f` | Correção proporcional ativa de rumo via giroscópio |
 

@@ -46,11 +46,9 @@
 // Limites em microssegundos (us)
 #define ESC_NEUTRO_US      1500     // Ponto neutro (motor parado)
 #define ESC_ARM_TEMPO_MS   3000     // Tempo segurando neutro no boot para armar o ESC
-#define ESC_DEADBAND_US 110.0f // Zona morta do ESC (100 us medidos); piso do feedforward
 // Fator de carga da curva PWM x RPM: razao entre a velocidade sob carga (robo no solo)
 // e a velocidade sem carga (medida pelo diag_motor_curve). Corrige o feedforward por velocidade.
-// 0.75 -> 0.80: teste no solo com a curva nova deu 60.9 RPM (alvo 55); com 0.80 o
-// feedforward cai ~10us e o pico tende a ~56 RPM.
+// Medido no solo em 17/11/2026: com 0.80, pico de ~60 RPM (alvo 55).
 #define CURVA_FATOR_CARGA 0.80f
 
 // Limites seguros operacionais
@@ -61,20 +59,19 @@
 // 4. PARÂMETROS DO CONTROLADOR PID E SINCRONISMO
 // ==========================================
 #define PID_KP_M1          1.8f
-#define PID_KI_M1          1.5f   // 0.6 -> 1.5: curva PWM x RPM (diag_motor_curve) mostrou que 55 RPM precisa de ~1740us sob carga, acima do teto anterior do PID
+#define PID_KI_M1          1.5f   // 55 RPM sob carga precisa de ~1740us; com Ki 0.6 o integral não alcançava esse teto
 #define PID_KD_M1          0.02f
 
 #define PID_KP_M2          1.8f
-#define PID_KI_M2          1.5f   // 0.6 -> 1.5: idem M1
+#define PID_KI_M2          1.5f   // idem M1
 #define PID_KD_M2          0.02f
 
 // Ganho de sincronismo cruzado entre rodas (Cross-Coupling Synchronization)
-#define K_SYNC             0.15f   // Aumentado para 0.15 para reforçar o acoplamento contra assimetria mecânica M2>M1
+#define K_SYNC             0.15f   // Aumentado para 0.15 para reforçar o acoplamento contra a assimetria mecânica entre as rodas
 
 // ==========================================
 // 4.1 FUSÃO SENSORIAL E CONTROLE ANGULAR COM IMU (BMI160)
 // ==========================================
-#define IMU_HABILITADA     true     // Habilita a correcao por giroscopio
 #define IMU_KP_YAW_RETA    2.0f     // Reforçado de 1.2 para 2.0 para eliminar desvios angulares em retas com perturbação no solo
 #define CONTROL_LOOP_MS    20       // Período de amostragem do loop de controle (20ms = 50Hz)
 
@@ -98,13 +95,13 @@
 // quando as ticks atingem este fator do alvo (evita giro infinito).
 #define PIVO_FALLBACK_FATOR    1.15f
 
-#define VELOCIDADE_CRUZEIRO_RPM 55.0f // Velocidade de cruzeiro dinamica ideal (~190 mm/s alvo, ~40 RPM real com momento estavel)
+#define VELOCIDADE_CRUZEIRO_RPM 55.0f // Alvo do controlador. Medido no solo: ~60 RPM pico (bateria 2S), ~190 mm/s
 #define VELOCIDADE_MIN_RPM      20.0f // Velocidade mínima de rampa (para não estolar)
 #define VELOCIDADE_GIRO_RPM     35.0f // Velocidade alvo para curvas em pivô central suavizado (evita overshoot por inércia)
 #define PAUSA_ENTRE_MOVIMENTOS_MS 800 // Pausa de estabilização entre movimentos
 
 // Distâncias de aceleração e desaceleração para perfil trapezoidal (em mm)
-#define RAMPA_ACEL_DIST_MM   50.0f  // Acelera de 20 a 80 RPM nos primeiros 50 mm (~0.25 s)
+#define RAMPA_ACEL_DIST_MM   50.0f  // Acelera de 20 a 55 RPM nos primeiros 50 mm (~0.25 s)
 #define RAMPA_DESACEL_DIST_MM 60.0f // Desacelera nos últimos 60 mm para parada sem deslizamento (~0.30 s)
 
 // Ângulos de aceleração e desaceleração para curva pivô (em graus)
@@ -139,14 +136,12 @@
 // ==========================================
 // 8. ESP-NOW (Gateway ESP32-S3 Super Mini)
 // ==========================================
-// Canal Wi-Fi do enlace ESP-NOW. ATENCAO: o canal efetivo e' o da interface
-// Wi-Fi. O gateway fica SEM AP e fixa este canal, mas o robô, associado ao AP,
-// opera no canal do AP (medido: 11). Para o enlace fechar, os dois precisam
-// coincidir: ajuste este valor para o canal do AP, ou configure o AP para este
-// canal. Registrar o peer com canal fixo divergente gera
-// "Peer channel is not equal to the home channel, send fail!".
-#define ESPNOW_CHANNEL          1
-// MAC do gateway ESP32-S3 (preencher apos gravar gateway_espnow.ino e ler o MAC
+// Canal do enlace ESP-NOW: o robô NÃO fixa canal — ele usa o canal atual da
+// interface Wi-Fi (peer registrado com canal 0), que é o canal do AP quando
+// associado. Quem fixa canal é o GATEWAY (gateway_espnow.ino, ESPNOW_CHANNEL),
+// que deve coincidir com o canal do AP. Registrar o peer com canal divergente
+// gera "Peer channel is not equal to the home channel, send fail!".
+// MAC do gateway (preencher apos gravar gateway_espnow.ino e ler o MAC
 // impresso no Serial). Broadcast = envia para qualquer gateway no canal.
 #define ESPNOW_GATEWAY_MAC      {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
 // Timeout sem receber do gateway: apos este periodo o robo reporta falha de enlace.

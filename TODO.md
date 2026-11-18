@@ -82,17 +82,19 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 
 ### [P3] Higiene de código e documentação
 
-8. **Comentários desatualizados em `config.h`.**
-   - Linha 93: `VELOCIDADE_CRUZEIRO_RPM 55.0f // ... ~40 RPM real ...` → o real medido é ~58 RPM.
-   - Linha 99: `RAMPA_ACEL_DIST_MM 50.0f // Acelera de 20 a 80 RPM` → o cruzeiro é 55 RPM, não 80.
+8. ~~**Comentários desatualizados em `config.h`.**~~ **ATENDIDO (18/11/2026).**
+   - `VELOCIDADE_CRUZEIRO_RPM`: "~40 RPM real" → medido ~60 RPM pico.
+   - `RAMPA_ACEL_DIST_MM`: "20 a 80 RPM" → 20 a 55 RPM.
+   - `CURVA_FATOR_CARGA`: comentário reescrito com a medição de 17/11 (pico ~60 RPM).
+   - `K_SYNC`: dizia "assimetria M2>M1"; a direção observada varia entre execuções — texto tornado neutro.
+   - `PID_KI_M1/M2`: comentário histórico "0.6 -> 1.5" reduzido à justificativa vigente.
 
-9. **Macro `IMU_HABILITADA` é código morto.**
-   - Definida em `config.h:77` como `true`, mas **nunca referenciada** em nenhum arquivo. O código usa `imu.isInitialized()` diretamente.
+9. ~~**Macro `IMU_HABILITADA` é código morto.**~~ **ATENDIDO (18/11/2026)** — removida. O código usa `imu.isInitialized()` diretamente; a macro nunca foi referenciada.
+   - **Bônus:** `ESC_DEADBAND_US` e `ESPNOW_CHANNEL` (do robô) também estavam mortos e foram removidos. Quem fixa canal é o gateway; o robô usa o canal atual da interface.
 
-10. **`PID_KI` com comentário histórico no valor.**
-    - `config.h:62`: o comentário explica "0.6 -> 1.5" — o valor vigente está correto (1.5), mas o comentário virou ruído.
+10. ~~**`PID_KI` com comentário histórico no valor.**~~ **ATENDIDO (18/11/2026)** — ver item 8.
 
-11. **FSD ainda cita "~40 RPM real em solo".**
+11. ~~**FSD ainda cita "~40 RPM real em solo".**~~ **ATENDIDO (18/11/2026)** — item 4 da seção 2.2 e a linha da tabela do `ESC_DEADBAND_US` (macro removida) corrigidos.
     - `docs/FSD.md:27`: texto de 13/11 não atualizado com o resultado de 16/11 (~58 RPM).
 
 12. **Manual Técnico não documenta o gravador em RAM nem as ferramentas de dump.**
@@ -105,11 +107,9 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
     - Como é um registro cronológico, pode ser intencional — mas convém uma nota de rodapé apontando o valor atual.
 
 14. **`diag_motor_curve/secrets.h` existe no disco e está ignorado pelo `.gitignore`.**
-    - Correto do ponto de vista de segurança (`**/secrets.h`), mas o sketch não tem um `secrets.h.example` próprio (o firmware V4 tem).
-    - Sem o example, outro usuário não sabe o que configurar para compilar o diagnóstico.
+    - Correto do ponto de vista de segurança (`**/secrets.h`), mas o sketch não tinha um `secrets.h.example` próprio (o firmware V4 tem). **ATENDIDO (18/11/2026)** — `diag_motor_curve/secrets.h.example` criado.
 
-15. **Artefato órfão `diag_motor_curve/gráfico.png`.**
-    - Não rastreado, não ignorado. Ou entra no repositório (documentação da curva) ou vai para o `.gitignore`.
+15. ~~**Artefato órfão `diag_motor_curve/gráfico.png`.**~~ **SEM OBJETO (18/11/2026)** — o arquivo não existe mais no disco (nunca foi rastreado). Nada a decidir.
 
 16. **`legacy/` com V1/V2/V3.**
     - Documentado como preservação histórica. Conforme o pretendido; apenas registrar que não deve ser compilado por engano.
@@ -145,7 +145,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 3. ~~**[P2]** Chart.js local (baixar o arquivo para PROGMEM ou servir do SPIFFS).~~ **ATENDIDO (17/11/2026)** — servido de `/chartjs.min.js` pelo próprio ESP32 (gzip em PROGMEM).
 4. ~~**[P2]** Mapa 2D com orientação real medida (remover `baseDeg` nominal).~~ **ATENDIDO (17/11/2026)** — ver item 5 dos problemas de fundo.
 5. ~~**[P2]** Testes automatizados: ao menos um teste de regressão da interpolação da curva e do critério de corte do pivô, com CI.~~ **ATENDIDO (17/11/2026)** — CI criada; 29 testes nativos (incluindo o critério de corte do pivô) e 11 Python passando.
-6. **[P3]** Higiene: comentários do `config.h`, remover `IMU_HABILITADA`, atualizar FSD:27 e a seção 5 do Manual, `secrets.h.example` para o `diag_motor_curve`.
+6. ~~**[P3]** Higiene: comentários do `config.h`, remover `IMU_HABILITADA`, atualizar FSD:27 e a seção 5 do Manual, `secrets.h.example` para o `diag_motor_curve`.~~ **ATENDIDO (18/11/2026)** — ver itens 8–15 da seção [P3].
 7. **[P3]** Decidir o destino de `diag_motor_curve/gráfico.png`.
 
 ---

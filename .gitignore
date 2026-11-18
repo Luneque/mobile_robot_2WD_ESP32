@@ -27,3 +27,7 @@ robo_monitor/*.log
 
 # Logs de telemetria
 robo_monitor/logs/*.csv
+
+# Cache do Python (testes e ferramentas)
+__pycache__/
+*.pyc
