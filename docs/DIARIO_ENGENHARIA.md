@@ -359,7 +359,26 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 21. Resumo da Estrutura Atual do Repositório
+### 21. Etapa 21: A/B da Correção de Yaw por IMU (18/11/2026)
+
+* **Motivação:** o usuário observou que a trajetória voltou a apresentar desvio nas retas e direção final diferente da inicial, e levantou a hipótese de que o ângulo medido pela IMU estaria atrapalhando.
+* **Método:** A/B em solo, mesmas condições (boot parado, mesmo piso). Variante temporária com `IMU_KP_YAW_RETA = 0.0f` (gravada e depois restaurada para 2.0). Métrica: soma dos módulos dos erros por lado (melhor indicador de precisão, pois o fechamento pode ser cancelamento de erros em sentidos opostos).
+
+  | Execução | Soma \|erros/lado\| | Fechamento | Direção final | Deriva por reta |
+  | :--- | :---: | :---: | :---: | :--- |
+  | A — kp = 2,0 | **22 mm** | 11 mm | **−0,83°** | +0,44 / −0,18 / −1,02 / −1,11 |
+  | B1 — kp = 0,0 | 81 mm | 8 mm | −1,70° | −1,46 / −0,77 / +0,02 / +0,12 |
+  | B2 — kp = 0,0 | **114 mm** | **40 mm** | **−6,10°** | −0,99 / −1,20 / −2,09 / −1,42 |
+
+* **Conclusão:** a correção de yaw por IMU é **essencial**, não prejudicial. Sem ela o desvio **acumula ao longo do quadrado** (na B2 a direção final ficou 6,1° fora) e a soma dos erros foi 4–5× maior. O ganho original (2,0) foi mantido.
+* **Hipótese descartada:** o sensor não é a causa do desvio residual.
+* **Causa real do desvio residual:** **assimetria mecânica entre os motores** — M1 consistentemente mais lenta (−18 a −62 ticks em ~10.450, ou 0,2–0,9% de diferença de velocidade), o que gera uma curva lenta e constante. O clampe da correção é ±50 µs e o uso observado é ~22 µs, ou seja, **há margem para aumentar o ganho**.
+* **Contexto histórico:** a deriva por reta variou entre **0,24° e 7,95°** em 13 execuções desde 12/11. As execuções recentes estão entre as melhores — não houve degradação, há variação.
+* **Próxima alavanca:** aumentar `IMU_KP_YAW_RETA` (2,0 → 3,0–4,0) e/ou o clampe (±50 → ±80 µs).
+
+---
+
+### 22. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.
