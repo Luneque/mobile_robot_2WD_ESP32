@@ -105,6 +105,9 @@ int32_t  g_odomSoma = 0;
 // param, e somar isso ao rumo global corromperia o mapa e a telemetria.
 float g_inerciaImu = 0.0f;
 float g_inerciaOdom = 0.0f;
+// Soma de TODAS as inercias (a do segmento atual e as anteriores). E' o que
+// permite o "rumo real" global: yawReal = g_yawAbs + g_inerciaTotal.
+float g_inerciaTotal = 0.0f;
 // Autoteste de calibragem do giroscopio (feito no boot, com o robô parado)
 float g_gyroBiasDps = 0.0f;
 float g_gyroPeakDps = 0.0f;
@@ -224,7 +227,8 @@ void integrarRumo(uint32_t now, float dt, bool naPausa) {
         imu.update(dt);
         float yawAmostra = imu.getYawAngleDeg();
         float delta = yawAmostra - g_yawPrevAmostra;
-        if (naPausa) g_inerciaImu += delta; else g_yawAbs += delta;
+        if (naPausa) { g_inerciaImu += delta; g_inerciaTotal += delta; }
+        else g_yawAbs += delta;
         g_yawPrevAmostra = yawAmostra;
     }
 
@@ -424,7 +428,7 @@ void enviarTelemetria(uint32_t now) {
     pkt.odomCiclos = g_odomCiclos;
     pkt.inercia    = g_inerciaImu;
     pkt.inerciaOdom = g_inerciaOdom;
-    pkt.yawReal    = g_yawAbs + g_inerciaImu;   // rumo real (corte + inercia)
+    pkt.yawReal    = g_yawAbs + g_inerciaTotal;   // rumo real (cortes + todas as inercias)
     pkt.rpm1       = rpm1;
     pkt.rpm2       = rpm2;
     pkt.ticks1     = t1;
@@ -473,7 +477,7 @@ void enviarTelemEspNow(uint32_t now) {
         "\"w1\":%u,\"w2\":%u,\"rt\":%.1f}",
         (unsigned long)now, estadoStr, g_ladoAtual, QUADRADO_LADOS, yaw, g_yawAbs,
         g_yawOdom, g_yawAbs - g_yawOdom, g_gyroBiasDps,
-        g_yawAbs + g_inerciaImu, g_inerciaImu, g_inerciaOdom,
+        g_yawAbs + g_inerciaTotal, g_inerciaImu, g_inerciaOdom,
         rpm1, rpm2, (long)t1, (long)t2, (long)g_targetTicks,
         (unsigned)g_lastPwm1, (unsigned)g_lastPwm2,
         g_emLinhaReta ? VELOCIDADE_CRUZEIRO_RPM : VELOCIDADE_GIRO_RPM);
@@ -776,6 +780,7 @@ void loop() {
                 // (tipicamente 2–3°) apareceria como erro lateral no mapa.
                 g_yawAbs = 0.0f;
                 g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
+                g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
                 g_odomSoma = 0;   // zera a instrumentacao de diagnostico
                 g_odomCiclos = 0;
                 g_ladoAtual = 1;
@@ -793,6 +798,7 @@ void loop() {
                 recorder.clear();
                 g_yawAbs = 0.0f;
                 g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
+                g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
                 g_odomSoma = 0;   // zera a instrumentacao de diagnostico
                 g_odomCiclos = 0;
                 g_ladoAtual = 1;
@@ -809,6 +815,7 @@ void loop() {
                 recorder.clear();
                 g_yawAbs = 0.0f;
                 g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
+                g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
                 g_odomSoma = 0;   // zera a instrumentacao de diagnostico
                 g_odomCiclos = 0;
                 g_ladoAtual = 1;
@@ -841,6 +848,7 @@ void loop() {
             recorder.clear();
             g_yawAbs = 0.0f;
             g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
+            g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
             g_odomSoma = 0;   // zera a instrumentacao de diagnostico
             g_odomCiclos = 0;
             g_ladoAtual = 1;
@@ -888,6 +896,7 @@ void loop() {
                     recorder.clear(); // Descarta amostras do teste anterior
                     g_yawAbs = 0.0f;
                     g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
+                    g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
                     g_odomSoma = 0;   // zera a instrumentacao de diagnostico
                     g_odomCiclos = 0;
                     g_ladoAtual = 1;
@@ -905,6 +914,7 @@ void loop() {
                 recorder.clear();
                 g_yawAbs = 0.0f;
                 g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
+                g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
                 g_odomSoma = 0;   // zera a instrumentacao de diagnostico
                 g_odomCiclos = 0;
                 g_ladoAtual = 1;

@@ -171,6 +171,19 @@ class TestDashboardJS(unittest.TestCase):
         for trecho in ("atualizarDiag", "inercia", "yawReal"):
             self.assertIn(trecho, js, "painel de diagnostico sem " + trecho)
 
+    def test_mapa_usa_o_rumo_real(self):
+        # O rastro do mapa tem de usar yawReal (corte + inercia). Com yawAbs o
+        # traco sai torto, ~5 graus por pivo a menos.
+        js = self._js_do_dashboard()
+        m = re.search(r"function updateOdometry\(d\)\s*\{(.*?)\n\}", js, re.S)
+        if m is None:
+            self.fail("nao achei updateOdometry")
+        corpo = m.group(1)
+        self.assertIn("d.yawReal !== undefined) ? d.yawReal", corpo,
+                      "mapa nao esta usando yawReal (rumo real, com inercia)")
+        self.assertIn("yawParaRumo(rumoReal)", corpo,
+                      "mapa nao esta integrando o rumo real")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

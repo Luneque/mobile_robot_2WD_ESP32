@@ -176,14 +176,14 @@ let posX = 500, posY = 0; // Ponto de partida real: Início (500, 0)
 let prevTicks = 0, prevSegSide = -1, prevSegState = '';
 let trajectory = [{x: 500, y: 0}];
 let curHeadingDeg = 0;      // Rumo GLOBAL real (0 = +Y, 90 = +X), integrado do yaw
-let yawAbs = 0;             // Rumo global (graus, horário = positivo), integrado do yaw
+let rumoReal = 0;          // Rumo global REAL (graus, horário = positivo), ja com a inercia
 let lastSt = '', lastSide = -1;
 
 function resetMap() {
   posX = 500; posY = 0;
-  // Mantém o rumo global atual: o yaw_abs do firmware é acumulado desde o
+  // Mantém o rumo global atual: o yaw do firmware é acumulado desde o
   // boot e não zera a cada trajeto, então zerar aqui dessintonizaria o mapa.
-  curHeadingDeg = yawParaRumo(yawAbs);
+  curHeadingDeg = yawParaRumo(rumoReal);
   prevTicks = 0; prevSegSide = -1; prevSegState = '';
   trajectory = [{x: 500, y: 0}];
   drawMap();
@@ -213,11 +213,14 @@ function updateOdometry(d) {
     prevTicks = curAvgTicks;
   }
 
-  // Integra o rumo global a partir do yaw absoluto da IMU.
+  // Integra o rumo global REAL (ja com a inercia) a partir do yaw da IMU.
   // Na reta, o robô anda no rumo corrente; o yaw medido já inclui o desvio real.
   if (d.st === 'RETA') {
-    yawAbs = d.yawAbs !== undefined ? d.yawAbs : yawAbs;
-    curHeadingDeg = yawParaRumo(yawAbs);
+    // Usa o rumo REAL (yawAbs + inercia). O yawAbs e' o valor congelado no
+    // corte; sem a inercia o rastro sai torto (~5 graus por pivo a menos).
+    rumoReal = (d.yawReal !== undefined) ? d.yawReal
+             : (d.yawAbs !== undefined ? d.yawAbs : rumoReal);
+    curHeadingDeg = yawParaRumo(rumoReal);
 
     const deltaTicks = curAvgTicks - prevTicks;
     if (deltaTicks > 0) {
@@ -230,8 +233,11 @@ function updateOdometry(d) {
     }
   } else if (d.st === 'PIVO') {
     // No pivô, o yaw absoluto cresce (giro horário); o rumo acompanha.
-    yawAbs = d.yawAbs !== undefined ? d.yawAbs : yawAbs;
-    curHeadingDeg = yawParaRumo(yawAbs);
+    // Usa o rumo REAL (yawAbs + inercia). O yawAbs e' o valor congelado no
+    // corte; sem a inercia o rastro sai torto (~5 graus por pivo a menos).
+    rumoReal = (d.yawReal !== undefined) ? d.yawReal
+             : (d.yawAbs !== undefined ? d.yawAbs : rumoReal);
+    curHeadingDeg = yawParaRumo(rumoReal);
     prevTicks = curAvgTicks;
   }
 }
@@ -414,6 +420,7 @@ function handle(d){
   atualizarDiag(d);
   // CSV buffer
   csvRows.push([d.ts,d.st,d.sd,d.of,d.yaw,d.yawAbs,d.yawOdom,d.diverg,d.gyroBias,
+                d.yawReal,d.inercia,
                 d.r1,d.r2,d.t1,d.t2,d.tg,d.w1,d.w2,d.rt]);
 }
 
@@ -428,7 +435,10 @@ function atualizarDiag(d){
   const bias = (d.gyroBias!==undefined) ? d.gyroBias : NaN;
   const ine = (d.inercia!==undefined) ? d.inercia : 0;
   const real = (d.yawReal!==undefined) ? d.yawReal : (d.yawAbs + ine);
-  const okDiv = Math.abs(div) < 5.0;
+  // Limiar alto de proposito: a odometria subestima ~5 graus por pivo (escala
+  // de distancia), entao a divergencia ACUMULADA passa de 5 graus mesmo com a
+  // IMU saudavel. O alerta e' para divergencias grandes demais.
+  const okDiv = Math.abs(div) < 30.0;
   const okBias = Math.abs(bias) < 0.5;
   const cor = (okDiv && okBias) ? '#3fb950' : (okDiv ? '#d29922' : '#f85149');
   el.innerHTML =
@@ -446,7 +456,7 @@ function atualizarDiag(d){
 // Download CSV
 function downloadCsv(){
   if(!csvRows.length){ alert('Sem dados ainda.'); return; }
-  const hdr = 'ts,estado,lado,totalLados,yaw,yawAbs,yawOdom,diverg,gyroBias,rpm1,rpm2,ticks1,ticks2,ticksAlvo,pwm1,pwm2,rpmAlvo\n';
+  const hdr = 'ts,estado,lado,totalLados,yaw,yawAbs,yawOdom,diverg,gyroBias,yawReal,inercia,rpm1,rpm2,ticks1,ticks2,ticksAlvo,pwm1,pwm2,rpmAlvo\n';
   const body = csvRows.map(r=>r.join(',')).join('\n');
   const blob = new Blob([hdr+body],{type:'text/csv'});
   const a = document.createElement('a');
