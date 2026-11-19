@@ -110,7 +110,7 @@ async def main_async(args):
     with open(saida, "w", encoding="utf-8") as f:
         for m in mensagens:
             f.write(m + "\n")
-        f.write("timestamp_ms,estado,lado,yaw_deg,yaw_abs_deg,rpm_esq,rpm_dir,ticks_esq,ticks_dir,ticks_alvo,pwm_esq_us,pwm_dir_us,rpm_alvo\n")
+        f.write("timestamp_ms,estado,lado,yaw_deg,yaw_abs_deg,yaw_odom_deg,diverg_deg,gyro_bias_dps,rpm_esq,rpm_dir,ticks_esq,ticks_dir,ticks_alvo,pwm_esq_us,pwm_dir_us,rpm_alvo\n")
         for l in linhas_rec:
             f.write(l + "\n")
 

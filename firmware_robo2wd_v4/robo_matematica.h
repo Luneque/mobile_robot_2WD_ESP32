@@ -22,6 +22,13 @@ static inline int32_t ticksParaArcoPivo(float anguloGraus) {
     return (int32_t)(arco_mm / MM_POR_PULSO);
 }
 
+// Rotacao do chassis (graus) a partir de um par de deltas de ticks COM SINAL.
+// Tracao diferencial: omega = (v1 - v2)/L. Sentido: dTicks1 > dTicks2 gira
+// anti-horario (mesma convencao do yaw do BMI160, eixo Z para cima).
+static inline float ticksDeltaParaGraus(int32_t dTicks1, int32_t dTicks2) {
+    return (float)(dTicks1 - dTicks2) * MM_POR_PULSO / DIST_RODAS_MM * (180.0f / PI);
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Criterios de parada dos segmentos.
 //

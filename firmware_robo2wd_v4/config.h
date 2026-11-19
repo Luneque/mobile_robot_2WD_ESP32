@@ -84,11 +84,21 @@
 #define QUADRADO_LADOS     4
 #define LADO_QUADRADO_MM   500.0f   // Comprimento de cada lado em mm (50 cm)
 #define ANGULO_CURVA_GRAUS 90.0f    // Ângulo de cada curva em graus
-// Antecipação do corte do pivô (graus): a IMU para em 90° menos este valor para
-// acomodar a inércia de frenagem. Calibrado no solo: o yaw registrado congela no
-// instante do corte, e cada 0.1° de antecipação desloca o resultado em ~0.1°.
-// Teste com 0.2° deu 90.71° -> subir para 0.7° para aproximar de 90.0°.
-#define PIVO_ANTECIPACAO_GRAUS 0.7f
+// Antecipação do corte do pivô (graus): corta o giro ANTES do alvo para
+// acomodar a inércia de frenagem — o robô continua girando depois de os
+// motores pararem.
+//
+// ATENCAO: calibrar pelo giro REAL no chão, nunca pelo yaw da IMU. O yaw
+// registrado congela no instante do corte e por isso as calibragens antigas
+// (0.2° -> 0.7°) mediam 90° na IMU enquanto o robô fazia ~95° de verdade.
+//
+// A inércia CRESCE quando se antecipa demais (o robô para mais rápido):
+//   0.7° -> corte 89.3°, inercia ~5.7°, real ~95°
+//   5.7° -> corte 84.3°, inercia 7.2°, real 91.5°   (melhor ponto)
+//   6.8° -> corte 83.2°, inercia 9.0°, real 93.1°
+// Por isso 5.7° é o valor vigente. Para baixar o resíduo, reduzir a
+// VELOCIDADE_GIRO_RPM (menos inércia), não antecipar mais.
+#define PIVO_ANTECIPACAO_GRAUS 5.7f
 
 // Guarda mínima de ticks do pivô: só aceita o yaw da IMU depois que a
 // odometria confirma movimento real (~9,6 mm de arco), evitando cortar por
@@ -100,7 +110,9 @@
 
 #define VELOCIDADE_CRUZEIRO_RPM 55.0f // Alvo do controlador. Medido no solo: ~60 RPM pico (bateria 2S), ~190 mm/s
 #define VELOCIDADE_MIN_RPM      20.0f // Velocidade mínima de rampa (para não estolar)
-#define VELOCIDADE_GIRO_RPM     35.0f // Velocidade alvo para curvas em pivô central suavizado (evita overshoot por inércia)
+// Velocidade alvo do pivô. Reduzida de 35 para 25 RPM: a inércia de frenagem
+// cresce com a velocidade, e era ela que fazia o giro passar de 90°.
+#define VELOCIDADE_GIRO_RPM     25.0f
 #define PAUSA_ENTRE_MOVIMENTOS_MS 800 // Pausa de estabilização entre movimentos
 
 // Distâncias de aceleração e desaceleração para perfil trapezoidal (em mm)

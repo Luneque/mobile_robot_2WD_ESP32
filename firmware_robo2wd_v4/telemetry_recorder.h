@@ -33,19 +33,22 @@
 #define REC_INTERVAL_MS     50      // 20 Hz de gravação
 #endif
 #ifndef REC_MAX_SAMPLES
-// 1984 amostras a 20 Hz = 99,2 s de teste.
-// (2000 amostras x 36 bytes = 72 KB; a RAM do ESP32 estava 240 bytes no limite,
-// então o buffer foi ajustado para caber com folga.)
-#define REC_MAX_SAMPLES     1984
+// 1700 amostras a 20 Hz = 85 s de teste.
+// O DRAM do ESP32 esta' no limite: cada amostra ocupa 40 bytes, entao o
+// buffer pesa 68 KB. As colunas de diagnostico (yawOdom/diverg/gyroBias)
+// acrescentaram 4 bytes por amostra; o buffer foi reduzido de 1984 para
+// 1700 amostras para caber. Se precisar de mais historico, reduza a
+// struct antes.
+#define REC_MAX_SAMPLES     1700
 #endif
 
 // Cabeçalho CSV do dump (compatível com o logger WebSocket)
 static const char REC_CSV_HEADER[] =
-    "timestamp_ms,estado,lado,yaw_deg,yaw_abs_deg,rpm_esq,rpm_dir,"
-    "ticks_esq,ticks_dir,ticks_alvo,pwm_esq_us,pwm_dir_us,rpm_alvo";
+    "timestamp_ms,estado,lado,yaw_deg,yaw_abs_deg,yaw_odom_deg,diverg_deg,gyro_bias_dps,"
+    "rpm_esq,rpm_dir,ticks_esq,ticks_dir,ticks_alvo,pwm_esq_us,pwm_dir_us,rpm_alvo";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Amostra gravada (compacta: 36 bytes)
+// Amostra gravada (compacta: 40 bytes)
 // ─────────────────────────────────────────────────────────────────────────────
 struct RecSample {
     uint32_t ts;        // millis() desde o boot
@@ -53,6 +56,9 @@ struct RecSample {
     uint8_t  lado;      // segmento atual (1–4)
     int16_t  yaw;       // graus * 100 (precisão de 0,01°, relativo ao segmento)
     int16_t  yawAbs;    // graus * 10 (rumo global integrado, horário = positivo)
+    int16_t  yawOdom;   // graus * 10 (rumo global por odometria dos encoders)
+    int16_t  diverg;    // graus * 10 (yawAbs - yawOdom)
+    int16_t  gyroBias;  // graus/s * 100 (bias residual medido no boot)
     int16_t  rpm1;      // RPM * 10
     int16_t  rpm2;      // RPM * 10
     int32_t  ticks1;
@@ -104,7 +110,8 @@ public:
 
     // Grava uma amostra se o intervalo mínimo já passou.
     void sample(uint32_t now, uint8_t estado, uint8_t lado,
-                float yaw, float yawAbs, float rpm1, float rpm2,
+                float yaw, float yawAbs, float yawOdom, float diverg, float gyroBias,
+                float rpm1, float rpm2,
                 int32_t ticks1, int32_t ticks2, int32_t ticksAlvo,
                 uint32_t pwm1, uint32_t pwm2, float rpmAlvo) {
         if (!_recording) return;
@@ -117,6 +124,9 @@ public:
         s.lado      = lado;
         s.yaw       = (int16_t)lroundf(yaw * 100.0f);
         s.yawAbs    = (int16_t)lroundf(yawAbs * 10.0f);
+        s.yawOdom   = (int16_t)lroundf(yawOdom * 10.0f);
+        s.diverg    = (int16_t)lroundf(diverg * 10.0f);
+        s.gyroBias  = (int16_t)lroundf(gyroBias * 100.0f);
         s.rpm1      = (int16_t)lroundf(rpm1 * 10.0f);
         s.rpm2      = (int16_t)lroundf(rpm2 * 10.0f);
         s.ticks1    = ticks1;
@@ -170,6 +180,9 @@ public:
             Serial.print(s.lado);      Serial.print(',');
             Serial.print(s.yaw / 100.0f, 2);  Serial.print(',');
             Serial.print(s.yawAbs / 10.0f, 1); Serial.print(',');
+            Serial.print(s.yawOdom / 10.0f, 1); Serial.print(',');
+            Serial.print(s.diverg / 10.0f, 1); Serial.print(',');
+            Serial.print(s.gyroBias / 100.0f, 2); Serial.print(',');
             Serial.print(s.rpm1 / 10.0f, 1);  Serial.print(',');
             Serial.print(s.rpm2 / 10.0f, 1);  Serial.print(',');
             Serial.print(s.ticks1);    Serial.print(',');
@@ -196,9 +209,10 @@ public:
         }
         const RecSample& s = _buf[idx];
         int k = snprintf(out, outLen,
-            "REC,%lu,%s,%u,%.2f,%.2f,%.1f,%.1f,%ld,%ld,%ld,%u,%u,%.1f",
+            "REC,%lu,%s,%u,%.2f,%.2f,%.2f,%.2f,%.2f,%.3f,%.1f,%.1f,%ld,%ld,%ld,%u,%u,%.1f",
             (unsigned long)s.ts, recEstadoTxt(s.estado), (unsigned)s.lado,
-            s.yaw / 100.0f, s.yawAbs / 10.0f, s.rpm1 / 10.0f, s.rpm2 / 10.0f,
+            s.yaw / 100.0f, s.yawAbs / 10.0f, s.yawOdom / 10.0f, s.diverg / 10.0f,
+            s.gyroBias / 100.0f, s.rpm1 / 10.0f, s.rpm2 / 10.0f,
             (long)s.ticks1, (long)s.ticks2, (long)s.ticksAlvo,
             (unsigned)s.pwm1, (unsigned)s.pwm2, s.rpmAlvo / 10.0f);
         if (k < 0) return 0;

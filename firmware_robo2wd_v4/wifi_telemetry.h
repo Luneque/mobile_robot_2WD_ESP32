@@ -56,6 +56,14 @@ struct TelemetryPacket {
     int         totalLados;  // sempre 4
     float       yaw;         // graus (com sinal, relativo ao início do segmento)
     float       yawAbs;      // graus (absoluto desde o boot; usado no mapa 2D)
+    float       yawOdom;     // graus (rumo por odometria dos encoders, ticks com sinal)
+    float       diverg;      // graus (yawAbs - yawOdom): divergencia IMU x odometria
+    float       gyroBias;    // graus/s (bias residual do giroscopio, medido no boot)
+    int32_t     odomSoma;    // soma de (dT1 - dT2) integrada (diagnostico)
+    uint32_t    odomCiclos;  // quantos ciclos de controle integraram a odometria
+    float       inercia;     // graus (giro da IMU depois do corte, na pausa)
+    float       inerciaOdom; // graus (giro da odometria depois do corte)
+    float       yawReal;     // graus (yawAbs + inercia: o rumo real)
     float       rpm1;        // RPM motor esquerdo
     float       rpm2;        // RPM motor direito
     int32_t     ticks1;      // ticks encoder esquerdo (valor absoluto)
@@ -130,6 +138,8 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
   <span id="badge" class="AGUARDO">AGUARDO</span>
   <span id="segTxt">Lado — de 4</span>
   <button class="btn" id="btnStart" onclick="sendCmd('start')">▶ START</button>
+  <button class="btn" id="btnReta"  onclick="sendCmd('t')" title="Uma reta de 500 mm, para no fim (diagnóstico de escala)">📏 Reta 500</button>
+  <button class="btn" id="btnPivo"  onclick="sendCmd('g')" title="Um pivô de 90° no lugar, para no fim (diagnóstico de ângulo)">🔄 Pivô 90</button>
   <button class="btn" id="btnCsv"   onclick="downloadCsv()">⬇ Download CSV</button>
   <button class="btn" id="btnDump"  onclick="sendCmd('dump')">🗒 Dump RAM</button>
 </div>
@@ -143,6 +153,9 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
       <span><i class="gr"></i> Real</span>
       <span><i class="or"></i> Posição</span>
       <button class="btn" onclick="resetMap()" style="margin-left:auto;background:#21262d;color:#8b949e;font-size:.72rem;padding:3px 10px;border:1px solid #30363d">↺ Reset</button>
+    </div>
+    <div id="diag" style="margin-top:8px;font:11px 'Segoe UI',monospace;color:#8b949e">
+      aguardando telemetria…
     </div>
   </div>
   <div class="card"><h2>RPM (Esq / Dir)</h2><canvas id="cRpm"></canvas></div>
@@ -397,14 +410,43 @@ function handle(d){
   // Atualiza mapa 2D
   updateOdometry(d);
   drawMap();
+  // Diagnostico: confere o rumo da IMU contra o da odometria e o bias do giroscopio
+  atualizarDiag(d);
   // CSV buffer
-  csvRows.push([d.ts,d.st,d.sd,d.of,d.yaw,d.yawAbs,d.r1,d.r2,d.t1,d.t2,d.tg,d.w1,d.w2,d.rt]);
+  csvRows.push([d.ts,d.st,d.sd,d.of,d.yaw,d.yawAbs,d.yawOdom,d.diverg,d.gyroBias,
+                d.r1,d.r2,d.t1,d.t2,d.tg,d.w1,d.w2,d.rt]);
+}
+
+// Painel de diagnostico: divergencia IMU x odometria + bias de calibragem.
+// Se o giroscopio estiver errado, |diverg| cresce; se o boot foi contaminado,
+// gyroBias aparece alto.
+function atualizarDiag(d){
+  const el = document.getElementById('diag');
+  if(!el) return;
+  const div = (d.diverg!==undefined) ? d.diverg : (d.yawAbs - d.yawOdom);
+  const odm = (d.yawOdom!==undefined) ? d.yawOdom : NaN;
+  const bias = (d.gyroBias!==undefined) ? d.gyroBias : NaN;
+  const ine = (d.inercia!==undefined) ? d.inercia : 0;
+  const real = (d.yawReal!==undefined) ? d.yawReal : (d.yawAbs + ine);
+  const okDiv = Math.abs(div) < 5.0;
+  const okBias = Math.abs(bias) < 0.5;
+  const cor = (okDiv && okBias) ? '#3fb950' : (okDiv ? '#d29922' : '#f85149');
+  el.innerHTML =
+    'rumo corte <b style="color:#58a6ff">' + ((d.yawAbs||0).toFixed(1)) + '°</b> · ' +
+    'inércia <b style="color:#f38021">' + (ine>=0?'+':'') + ine.toFixed(1) + '°</b> · ' +
+    'rumo real <b style="color:#3fb950">' + (real>=0?'+':'') + real.toFixed(1) + '°</b> · ' +
+    'rumo odometria <b style="color:#a371f7">' + (isNaN(odm)?'—':odm.toFixed(1)) + '°</b> · ' +
+    'divergência <b style="color:' + cor + '">' + (isNaN(div)?'—':(div>=0?'+':'') + div.toFixed(1)) + '°</b>' +
+    (okDiv ? '' : ' ⚠') +
+    ' &nbsp;|&nbsp; bias giro <b style="color:' + (okBias?'#3fb950':'#f85149') + '">' +
+    (isNaN(bias)?'—':(bias>=0?'+':'') + bias.toFixed(2)) + ' °/s</b>' +
+    (okBias ? '' : ' ⚠ boot contaminado?');
 }
 
 // Download CSV
 function downloadCsv(){
   if(!csvRows.length){ alert('Sem dados ainda.'); return; }
-  const hdr = 'ts,estado,lado,totalLados,yaw,yawAbs,rpm1,rpm2,ticks1,ticks2,ticksAlvo,pwm1,pwm2,rpmAlvo\n';
+  const hdr = 'ts,estado,lado,totalLados,yaw,yawAbs,yawOdom,diverg,gyroBias,rpm1,rpm2,ticks1,ticks2,ticksAlvo,pwm1,pwm2,rpmAlvo\n';
   const body = csvRows.map(r=>r.join(',')).join('\n');
   const blob = new Blob([hdr+body],{type:'text/csv'});
   const a = document.createElement('a');
@@ -506,6 +548,14 @@ public:
         doc["of"]  = pkt.totalLados;
         doc["yaw"] = roundf(pkt.yaw * 100.0f) / 100.0f;
         doc["yawAbs"] = roundf(pkt.yawAbs * 100.0f) / 100.0f;
+        doc["yawOdom"] = roundf(pkt.yawOdom * 100.0f) / 100.0f;
+        doc["diverg"] = roundf(pkt.diverg * 100.0f) / 100.0f;
+        doc["gyroBias"] = roundf(pkt.gyroBias * 1000.0f) / 1000.0f;
+        doc["odomSoma"] = pkt.odomSoma;
+        doc["odomCiclos"] = pkt.odomCiclos;
+        doc["inercia"] = roundf(pkt.inercia * 100.0f) / 100.0f;
+        doc["inerciaOdom"] = roundf(pkt.inerciaOdom * 100.0f) / 100.0f;
+        doc["yawReal"] = roundf(pkt.yawReal * 100.0f) / 100.0f;
         doc["r1"]  = roundf(pkt.rpm1 * 10.0f) / 10.0f;
         doc["r2"]  = roundf(pkt.rpm2 * 10.0f) / 10.0f;
         doc["t1"]  = pkt.ticks1;
@@ -615,6 +665,12 @@ private:
                 } else if (msg == "dump" || msg == "d") {
                     _newCommand = true;   // dispara o tratamento no loop principal
                     _lastCmd    = 'd';    // dump do gravador de telemetria (RAM)
+                } else if (msg == "reta" || msg == "t") {
+                    _newCommand = true;   // reta unica de 500 mm (diagnostico)
+                    _lastCmd    = 't';
+                } else if (msg == "pivo" || msg == "g") {
+                    _newCommand = true;   // pivo unico de 90 graus (diagnostico)
+                    _lastCmd    = 'g';
                 }
                 break;
             }

@@ -34,6 +34,7 @@ except ImportError:
 
 CABECALHO_CSV = [
     "timestamp_ms", "estado", "lado", "total_lados", "yaw_deg", "yaw_abs_deg",
+    "yaw_odom_deg", "diverg_deg", "gyro_bias_dps",
     "rpm_esq", "rpm_dir", "ticks_esq", "ticks_dir", "ticks_alvo",
     "pwm_esq_us", "pwm_dir_us", "rpm_alvo",
 ]
@@ -63,6 +64,7 @@ class GatewayPonte:
         self._csv_writer.writerow([
             dados.get("ts", ""), dados.get("st", ""), dados.get("sd", ""),
             dados.get("of", ""), dados.get("yaw", ""), dados.get("yawAbs", ""),
+            dados.get("yawOdom", ""), dados.get("diverg", ""), dados.get("gyroBias", ""),
             dados.get("r1", ""),
             dados.get("r2", ""), dados.get("t1", ""), dados.get("t2", ""),
             dados.get("tg", ""), dados.get("w1", ""), dados.get("w2", ""),

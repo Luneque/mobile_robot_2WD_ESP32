@@ -76,6 +76,27 @@ int main() {
     verificar("feedforward de 55 RPM sob carga", perto(ff, 208.6f, 1.5f),
               "feedforward fora do calibrado (afeta a velocidade final)");
 
+    // ── Odometria de rumo (diagnostico IMU x encoders) ──────────────────────
+    // Pivo de 90 graus: cada roda percorre o arco de 90 graus.
+    int32_t t90 = ticksParaArcoPivo(90.0f);
+    float pivo90 = ticksDeltaParaGraus(t90, -t90);
+    verificar("pivo de 90 graus por odometria", perto(pivo90, 90.0f, 0.5f),
+              "a odometria nao reproduz o angulo do pivô");
+
+    // Reta: as duas rodas em igualdade nao giram o chassis.
+    verificar("reta nao gera rotacao", perto(ticksDeltaParaGraus(1000, 1000), 0.0f, 0.001f),
+              "reta deveria ter rotacao nula");
+
+    // Uma roda parada: giro em torno dela, taxa dobrada.
+    float meiaVolta = ticksDeltaParaGraus(t90, 0);
+    verificar("roda parada dobra a taxa", perto(meiaVolta, 45.0f, 0.5f),
+              "giro em torno da roda parada deveria ser 45 graus");
+
+    // Convenção de sinal: M1 a frente e M2 atras = anti-horario (positivo),
+    // o mesmo sinal do yaw do BMI160.
+    verificar("sinal anti-horario", ticksDeltaParaGraus(500, -500) > 0.0f,
+              "sinal trocado: a divergencia ia errar o lado no dashboard");
+
     std::printf("\n%d testes, %d falhas\n", _testes, _falhas);
     return _falhas == 0 ? 0 : 1;
 }

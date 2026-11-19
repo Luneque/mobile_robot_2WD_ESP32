@@ -399,7 +399,40 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 23. Resumo da Estrutura Atual do Repositório
+### 23. Etapa 23: Diagnóstico de Rumo — IMU × Odometria (18/11/2026)
+
+* **Motivação:** o usuário mediu no chão (régua e transferidor) **~15 cm de fechamento e ~30° de erro de direção final**, enquanto a telemetria reporta **~11 mm e ~0,8°**. A suspeita era do sensor (IMU). O mesmo comportamento se repete em vários testes.
+* **Verificação prévia (logs já existentes):** comparando o yaw da IMU com o yaw por odometria dos encoders, os dois **concordam** — por segmento a diferença é de 1–2° por pivô, e numa volta completa a odometria acumula ~3% a menos (5–10°). Nada disso explica 30°. Ou seja: a telemetria é internamente consistente, mas existia uma divergência sistemática não medida.
+* **Implementado (a "ferramenta auxiliar de diagnóstico" pedida):**
+  * `g_yawOdom` — rumo global integrado dos **ticks com sinal** (`ticksDeltaParaGraus()` em `robo_matematica.h`), fonte **independente** da IMU. Hoje tudo usava `abs()`.
+  * `diverg = yawAbs − yawOdom` e `gyroBias` — publicados no WebSocket, no ESP-NOW e no gravador.
+  * **Painel de diagnóstico no dashboard:** rumo IMU × rumo odometria, divergência (alerta acima de 5°) e bias do giro (alerta acima de 0,5 °/s).
+  * **Autoteste de boot:** depois da calibração, mede a taxa de yaw parada por 2 s **sem a zona morta de ruído** (0,25 °/s — que é justamente o que a esconde). Boot contaminado aparece como `gyroBias` alto, com aviso no Serial e no dashboard.
+* **Custo:** +6 bytes por amostra no gravador (4 bytes úteis após o alinhamento da struct); `REC_MAX_SAMPLES` 1984 → **1700** (85 s) para caber no DRAM. Compilação: **1.126.747 bytes (85%) flash, 120.840 (36%) RAM**.
+* **Testes:** 4 novos testes nativos da odometria (pivô de 90°, reta nula, roda parada, sinal anti-horário) e 3 novos testes Python de formato (16 colunas no replay, 17 no gateway, colunas de diagnóstico). **16 + 17 nativos e 12 Python passando.**
+
+---
+
+### 24. Etapa 24: A inércia do pivô — a causa real do desvio (18/11/2026)
+
+* **Motivação:** o usuário mediu no chão **~15 cm de fechamento e ~30° de erro de direção**; a telemetria reportava **~11 mm e ~0,8°**. A suspeita era a IMU.
+* **Diagnóstico (Etapa 23):** rumo por odometria (`g_yawOdom`), divergência IMU × odometria, bias do giroscópio no boot, e os comandos `📏 Reta 500` / `🔄 Pivô 90`.
+* **Descoberta: a IMU estava certa.** O firmware **parava de medir exatamente no instante do corte**, e a **inércia de frenagem** (~5–9° por pivô) ficava invisível. Por isso as calibragens antigas — feitas pelo yaw da IMU — concluíram que 0,7° de antecipação bastava.
+* **A inércia CRESCE quando se antecipa o corte** (o robô para mais rápido):
+  | Antecipação | Corte | Inércia | Giro real |
+  | :--- | :---: | :---: | :---: |
+  | 0,7° | 89,3° | ~5,7° | ~95° |
+  | **5,7°** | 84,3° | 7,2° | **91,5°** (melhor ponto) |
+  | 6,8° | 83,2° | 9,0° | 93,1° |
+* **Correção definitiva:** `VELOCIDADE_GIRO_RPM` 35 → **25 RPM** (menos inércia) + `PIVO_ANTECIPACAO_GRAUS` **5,7°**. Resultado: inércia 5,23° e **giro real 90,32°**.
+* **Resultado no quadrado:** fechamento **12,2 mm** (antes ~150 mm) · erro de direção **−0,46°** (antes ~30°) · pivôs 88,5–91,7° (média 89,89°) · lados ~503 mm.
+* **Instrumentação:** `inercia`, `inerciaOdom` e `yawReal` na telemetria. A inércia fica em **acumuladores separados** — somá-la ao rumo global corrompia o mapa, porque a IMU deriva ao parar os motores (~4,4° em 4 s na reta).
+* **Correção de Wi-Fi:** `g_wifiOk` era setado uma única vez no `setup()` e nunca re-verificado; uma queda de Wi-Fi deixava o dashboard "Desconectado" até um reboot. Agora o `loop()` vigia `WiFi.status()` e reconecta a cada 5 s.
+* **Bug do dashboard:** um `)` a mais em `ine.toFixed(1))` quebrava o JavaScript inteiro **em silêncio** (gráficos, badge e mapa paravam de atualizar). Corrigido e protegido por `test_js_do_dashboard_compila`, que compila o `<script>` inline do dashboard com `node --check`.
+
+---
+
+### 25. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.

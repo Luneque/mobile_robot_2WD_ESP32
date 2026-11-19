@@ -98,6 +98,12 @@ public:
         _currentYawRateDps = 0.0f;
     }
 
+    // Taxa de yaw SEM a zona morta de ruido — usada no autoteste de calibragem.
+    float getRawYawRateDps() {
+        if (!_initialized) return 0.0f;
+        return readRawGyroZ() - _gzOffset;
+    }
+
     float getYawAngleDeg() const { return _yawAngleDeg; }
     float getYawRateDps() const { return _currentYawRateDps; }
     bool isInitialized() const { return _initialized; }

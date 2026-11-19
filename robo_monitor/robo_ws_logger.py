@@ -138,6 +138,9 @@ class RoboLogger:
             "lado",
             "yaw_deg",
             "yaw_abs_deg",
+            "yaw_odom_deg",
+            "diverg_deg",
+            "gyro_bias_dps",
             "rpm_esq",
             "rpm_dir",
             "ticks_esq",
@@ -164,6 +167,9 @@ class RoboLogger:
             dados.get("sd", ""),
             dados.get("yaw", ""),
             dados.get("yawAbs", ""),
+            dados.get("yawOdom", ""),
+            dados.get("diverg", ""),
+            dados.get("gyroBias", ""),
             dados.get("r1", ""),
             dados.get("r2", ""),
             dados.get("t1", ""),
@@ -369,7 +375,9 @@ class RoboLogger:
 # Replay de dump do gravador de telemetria (RAM)
 # -------------------------------------------------------------------------
 CABECALHO_CSV = [
-    "timestamp_ms", "estado", "lado", "yaw_deg", "yaw_abs_deg", "rpm_esq", "rpm_dir",
+    "timestamp_ms", "estado", "lado", "yaw_deg", "yaw_abs_deg", "yaw_odom_deg",
+    "diverg_deg", "gyro_bias_dps",
+    "rpm_esq", "rpm_dir",
     "ticks_esq", "ticks_dir", "ticks_alvo", "pwm_esq_us", "pwm_dir_us", "rpm_alvo",
 ]
 
@@ -389,7 +397,7 @@ def replay_dump(caminho_entrada: pathlib.Path, caminho_saida: pathlib.Path | Non
             if not linha.startswith("REC,"):
                 continue
             partes = linha.split(",")
-            if len(partes) != 14:
+            if len(partes) != 17:
                 continue
             amostras.append(partes[1:])   # descarta o prefixo "REC"
 
