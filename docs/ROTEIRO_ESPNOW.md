@@ -112,7 +112,7 @@ Se as linhas `MAC:`/`DBG:` não aparecerem, o gateway precisa de um reset
 
 3. Confira se `telemetria_espnow.csv` está sendo gravado com as linhas.
 
-**Critério de aceite:** telemetria fluindo a ~5 Hz, sem mensagens
+**Critério de aceite:** telemetria fluindo a ~20 Hz em movimento (2 Hz parado), sem mensagens
 `DBG:ERRO ao enviar CMD` no Monitor Serial do gateway.
 
 ---

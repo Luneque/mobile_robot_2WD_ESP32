@@ -432,7 +432,20 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ---
 
-### 25. Resumo da Estrutura Atual do Repositório
+### 25. Etapa 25: Rumo real — o `yawReal` e o mapa 2D (19/11/2026)
+
+* **Dois defeitos no mesmo tema:**
+  1. O `yawReal` era `g_yawAbs + g_inerciaImu` — ou seja, somava a inércia **apenas do último segmento**. O rumo final ficava ~14° errado.
+  2. O rastro do mapa usava `yawAbs` — o rumo **congelado no corte**. Como cada pivô corta em ~84° e a inércia completa ~90°, o traçado saía **torto ~5° por pivô** (o quadrado abria ~1,6°/lado e não fechava).
+* **Correção:** `g_inerciaTotal` acumula a inércia de **todos** os segmentos (zera só no `start`), e `yawReal = g_yawAbs + g_inerciaTotal`. O mapa passou a usar `yawReal` (com fallback para `yawAbs` em firmware antigo).
+* **Alerta de divergência:** o limiar de 5° disparava sempre, porque a divergência **acumulada** é normal (~5° por pivô × 4 = ~20°). Limiar → **30°**.
+* **CSV do dashboard** ganhou `yawReal` e `inercia`.
+* **Teste novo:** `test_mapa_usa_o_rumo_real` (garante que o mapa usa `yawReal` e não `yawAbs`).
+* **Validação no solo:** fechamento de **7,8–8,7 mm**, lados de 503–504 mm pelos ticks, pivôs 88,2–90,7° (média ≈ 89,7°), erro de direção −1,3° a −2,4°. O mapa fechou em ~7 mm com o rumo final em 2,76° e extensão 500 × 500.
+
+---
+
+### 26. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
 * **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.
@@ -444,7 +457,18 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 * **`diag_i2c_bmi160/`:** Utilitário de diagnóstico I2C da IMU Bosch BMI160.
 * **`calib_imu_polaridade/`:** Ferramenta de validação da polaridade do eixo Z da IMU.
 * **`diag_motor_curve/`:** Utilitário de bancada que levanta a curva PWM × RPM dos motores (com Wi-Fi/WebSocket, buffer em RAM e página web), usado para decidir entre ajuste de PID e recalibração de ESC.
-* **`robo_monitor/`:** Ferramentas Python: `robo_ws_logger.py` (telemetria + `--replay` de dump para CSV), `capturar_dump.py` (dump via serial) e `capturar_dump_wifi.py` (dump via WebSocket, com reconexão).
+* **`robo_monitor/`:** Ferramentas Python: `robo_ws_logger.py` (telemetria + `--replay` de dump para CSV), `capturar_dump.py` (dump via serial) e `capturar_dump_wifi.py` (dump via WebSocket, com reconexão), `gateway_espnow.py` (ponte serial do gateway).
+* **`tests/`:** Testes automatizados sem hardware — `tests/native/` (16 + 17 testes sobre `robo_matematica.h` e o critério de corte do pivô) e `tests/python/` (15 testes de ferramentas, cabeçalhos e do JS do dashboard). Rodados no CI.
+* **`ferramentas/`:** Geradores de assets (ex.: `gerar_chartjs_asset.py`, que publica o Chart.js gzip em PROGMEM).
+
+## 📄 Atualizações Recentes (19/11/2026)
+
+- **`yawReal` (rumo real):** `g_yawAbs + g_inerciaTotal` — cortes + inércia de **todos** os pivôs (Etapa 25).
+- **Mapa 2D:** rastro passa a usar o rumo real; antes usava `yawAbs` e saía torto ~5° por pivô.
+- **Pivô recalibrado:** `VELOCIDADE_GIRO_RPM` 25 RPM e `PIVO_ANTECIPACAO_GRAUS` 5,7°.
+- **Diagnóstico:** `g_yawOdom`, `diverg`, `gyroBias` com autoteste no boot; comandos `reta` (`t`) e `pivô` (`g`).
+- **Resultado no solo:** fechamento de 7,8–8,7 mm; pivôs 88,2–90,7°; mapa fechando em ~7 mm.
+- **Documentação:** README, FSD, Manual, TODO e Diário atualizados para os valores vigentes.
 
 ## 📄 Atualizações Recentes (16/11/2026)
 

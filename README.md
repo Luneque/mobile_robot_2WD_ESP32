@@ -15,13 +15,17 @@ O sistema executa com extrema repetibilidade e controle em malha fechada uma tra
 ## 🚀 Destaques da Versão 4 (Oficial)
 
 * **Conectividade Sem Fio e Telemetria em Tempo Real:**
-  * **Wi-Fi Station & WebSocket Server (5 Hz):** Transmissão contínua de telemetria completa (RPM alvo/real, pulsos de encoders, ângulo de Yaw da IMU, comandos PWM e estados da FSM).
+  * **Wi-Fi Station & WebSocket Server (telemetria adaptativa: 20 Hz em movimento / 2 Hz parado):** Transmissão contínua de telemetria completa (RPM alvo/real, pulsos de encoders, ângulo de Yaw da IMU, comandos PWM e estados da FSM).
   * **Dashboard Web Embarcado (PROGMEM):** Acessível diretamente pelo navegador via `http://robo.local/` ou pelo IP local, com gráficos em tempo real (Chart.js), visualização de estado, disparo remoto de trajetória e exportação direta para CSV.
   * **Ponte ESP-NOW (ESP32-S3 Super Mini):** Firmware dedicado em `gateway_espnow/` para operação transparente via rádio 2.4 GHz em campo ou bancada sem necessidade de roteador Wi-Fi.
   * **Monitor e Logger Python:** Utilitário assíncrono em `robo_monitor/` para gravação e análise automatizada de corridas.
 * **Fusão Sensorial e Orientação Absoluta (IMU Bosch BMI160):**
   * Correção giroscópica contínua em retas (`IMU_KP_YAW_RETA = 2.0`) reduzindo o desvio angular para menos de 1°.
-  * Parada de pivô por delta de Yaw (`|deltaYaw| >= 89.3°`, antecipação de 0.7°), eliminando erros de derrapagem nas curvas de 90°.
+  * Parada de pivô por delta de Yaw com **antecipação calibrada**: `PIVO_ANTECIPACAO_GRAUS = 5.7°` e `VELOCIDADE_GIRO_RPM = 25`. O corte ocorre em ~84° e a **inércia de frenagem** (~5°) completa os ~90° — sem derrapagem nem overshoot.
+* **Diagnóstico de Rumo e Odometria:**
+  * Rumo por odometria (`g_yawOdom`), divergência IMU × encoders (`diverg`) e **autoteste de bias do giroscópio no boot**.
+  * Telemetria com `yawReal` (corte + inércia), `inercia` e `inerciaOdom`.
+  * Comandos de bancada no dashboard: `📏 Reta 500` e `🔄 Pivô 90`.
 * **Compensação Dinâmica de Zona Morta e Atrito:**
   * Feedforward proporcional à velocidade (curva PWM×RPM medida em bancada, corrigida por `CURVA_FATOR_CARGA = 0.80`), eliminando tempo de estol na partida e entregando pulso adequado em qualquer velocidade alvo.
 * **Periféricos Nativos de Silício (ESP-IDF):**
@@ -95,6 +99,23 @@ Teste_car_0/
 * 📄 **[Especificação Funcional (FSD v4.0)](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/FSD.md)**
 * 📄 **[Roteiro de Validação do Enlace ESP-NOW](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/ROTEIRO_ESPNOW.md)**
 * 📄 **[Diário de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/DIARIO_ENGENHARIA.md)**
+
+## 📄 Atualizações Recentes (19/11/2026)
+
+### Firmware
+- **Rumo real com inércia:** `yawReal` = `g_yawAbs + g_inerciaTotal` — os cortes **mais** a inércia de frenagem de **todos** os pivôs. O valor anterior congelava no corte e escondia ~5–9° por pivô, e o `yawReal` somava só a inércia do último segmento (~14° errado no fim).
+- **Pivô recalibrado em solo:** `VELOCIDADE_GIRO_RPM` 35 → **25 RPM** e `PIVO_ANTECIPACAO_GRAUS` 0,7° → **5,7°**. Pivôs medidos em 88,2–90,7° (média ≈ 89,7°).
+- **Diagnóstico de rumo:** `g_yawOdom` (odometria com sinal), `diverg` (IMU × encoders), `gyroBias` com autoteste no boot, e acumuladores separados de inércia (`inercia`, `inerciaOdom`).
+- **Comandos de bancada no dashboard:** `📏 Reta 500` (`t`) e `🔄 Pivô 90` (`g`).
+- **Wi-Fi:** reconexão automática no `loop()` — antes `g_wifiOk` era setado uma única vez no `setup()` e uma queda deixava o dashboard "Desconectado".
+- **Gravador:** 1700 amostras × 40 bytes (85 s) — as colunas de diagnóstico estouraram o DRAM em 1984.
+
+### Resultados no solo
+- **Quadrado:** fechamento de **7,8–8,7 mm**, lados de 503–504 mm pelos ticks, erro de direção de **−1,3° a −2,4°**.
+- **Mapa do dashboard:** rastro desenhado com o **rumo real**; o quadrado ideal fecha em ~7 mm e o traçado coincide.
+
+### Testes
+- 16 + 17 testes nativos, 15 Python (inclui validação de sintaxe do JS do dashboard com `node --check`).
 
 ## 📄 Atualizações Recentes (16/11/2026)
 

@@ -1,7 +1,7 @@
 # TODO — Projeto Robô 2WD (Teste_car_0)
 
-Revisão completa do estado do projeto em **16/11/2026**, após o commit `fa01d2a`
-(feedforward por velocidade, gravador em RAM, calibração no solo).
+Revisão completa do estado do projeto em **19/11/2026**, após o commit `3ca004f`
+(rumo real com inércia, pivô recalibrado, diagnóstico de rumo, mapa com rumo real).
 
 Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qualidade/robustez · **[P3]** higiene/evolução.
 
@@ -9,21 +9,20 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 
 ## 1. Estado Atual (resumo)
 
-- **Firmware oficial:** `firmware_robo2wd_v4/` (v4.0.0). Compila: 1.042.211 bytes (79%) flash, 116.648 bytes (35%) RAM.
-- **Último teste em solo válido** (robô posicionado corretamente):
+- **Firmware oficial:** `firmware_robo2wd_v4/` (v4.0.0). Compila: **1.130.039 bytes (86%)** flash, **120.864 bytes (36%)** RAM.
+- **Último teste em solo válido** (robô posicionado corretamente, 19/11/2026):
 
   | Métrica | Valor | Alvo |
   | :--- | :---: | :---: |
-  | Pico de RPM nas retas | 58,4 | 55 |
-  | PWM máximo | 1744 µs | — |
-  | Tempo por reta | 3,75 s | — |
-  | Yaw médio do pivô | 90,29° | 90,0° |
-  | Desvio padrão do pivô | 0,54° | — |
-  | Yaw final das retas | −0,70° a +0,26° | 0° |
-  | Ticks por reta | 10.446–10.516 | 10.417 |
+  | Fechamento do quadrado | **7,8–8,7 mm** | 0 |
+  | Lados (pelos ticks) | 503–504 mm | 500 |
+  | Pivôs (rumo real) | 88,2–90,7° (média ≈ 89,7°) | 90,0° |
+  | Erro de direção final | −1,3° a −2,4° | 0° |
+  | Divergência IMU × odometria | ~5° por pivô (acumulada ~20°) | — |
 
-- **Working tree:** limpo, exceto `diag_motor_curve/gráfico.png` (artefato não rastreado).
-- **Branch:** `main` sincronizado com `origin/main` até `fa01d2a`.
+- **Working tree:** limpo.
+- **Branch:** `main` sincronizado com `origin/main` até `3ca004f`.
+- **Testes:** 16 + 17 nativos, 15 Python, CI verde.
 
 ---
 
@@ -63,6 +62,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
    - Validação no solo: trajetória anti-horária fechando em **14 mm**; erro por lado 13/20/18/14 mm; pico de 54,5 RPM; pivôs 89,78–90,98°.
    - **Correção de rumo que a versão nominal escondia:** o quadrado ideal desenhado era horário, mas o trajeto real é anti-horário. O BMI160 tem Z para cima (yaw positivo = anti-horário, regra da mão direita) e o mapa usa convenção horária, então o rumo renderizado é `-yawAbs`.
    - **Deriva em repouso:** o `yaw_abs` acumulado desde o boot chegava a ~2,8° no momento do `start` (140 s parado), o que sozinho gerava ~35 mm de erro lateral em L1. O referencial agora é ancorado no `start` (`g_yawAbs = 0`), reduzindo esse erro para 13 mm.
+   - **Atualização (19/11/2026):** o rastro passou a usar o **rumo real** (`yawReal` = corte + inércia de **todos** os pivôs). Com `yawAbs` (rumo congelado no corte) o traçado saía torto ~5° por pivô. O `yawReal` também foi corrigido: antes somava só a inércia do último segmento, deixando o rumo final ~14° errado.
 
 6. ~~**Sem testes automatizados.**~~ **PARCIALMENTE ATENDIDO (17/11/2026).**
    - Criado o diretório `tests/` com testes que rodam **sem hardware**:
@@ -71,7 +71,8 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
    - **CI:** `.github/workflows/ci.yml` com dois jobs — `testes` (Python + nativo) e `build` (compila o firmware do robô e o gateway via `arduino/compile-sketches`).
    - Para viabilizar os testes nativos, `ticksParaMm()` e `ticksParaArcoPivo()` foram extraídas para `firmware_robo2wd_v4/robo_matematica.h` — **as fórmulas são idênticas** e o binário resultante tem o mesmo tamanho (1.123.859 bytes).
    - **O que falta para fechar o item:** testes do critério de corte do pivô (extrair `atingiuMetaPivo()`), do perfil trapezoidal e do `yawParaRumo()` do dashboard (JS). Os dois últimos exigem mais refactor; o do pivô é o mais valioso e o mais sensível (mexe no laço de controle).
-   - **Atualização (17/11/2026):** `tests/native/test_pivo.cpp` criado — **17 testes** do critério de parada (guarda de 200 ticks, antecipação de 0,7°, fallback 1,15×, modo sem IMU e reta), incluindo **fixtures reais** dos quatro pivôs medidos no solo. `atingiuMetaReta()`/`atingiuMetaPivo()` extraídas para `robo_matematica.h`, com as expressões idênticas. Total: **29 testes nativos**.
+   - **Atualização (17/11/2026):** `tests/native/test_pivo.cpp` criado — **17 testes** do critério de parada (guarda de 200 ticks, antecipação, fallback 1,15×, modo sem IMU e reta), incluindo **fixtures reais** dos quatro pivôs medidos no solo. `atingiuMetaReta()`/`atingiuMetaPivo()` extraídas para `robo_matematica.h`, com as expressões idênticas. Total: **29 testes nativos**.
+   - **Atualização (19/11/2026):** `tests/python/test_ferramentas.py` — **15 testes**, incluindo `test_js_do_dashboard_compila` (compila o `<script>` do dashboard com `node --check`; um `)` a mais já quebrou o JS inteiro **em silêncio**) e `test_mapa_usa_o_rumo_real`.
 
 7. ~~**Telemetria de 5 Hz é pouco para análise dinâmica.**~~ **ATENDIDO (16/11/2026).**
    - Implementada **telemetria adaptativa**: 20 Hz durante `RETA`/`PIVO`, 2 Hz em `AGUARDO`/`CONCLUIDO` (WebSocket e ESP-NOW).
@@ -97,14 +98,11 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 11. ~~**FSD ainda cita "~40 RPM real em solo".**~~ **ATENDIDO (18/11/2026)** — item 4 da seção 2.2 e a linha da tabela do `ESC_DEADBAND_US` (macro removida) corrigidos.
     - `docs/FSD.md:27`: texto de 13/11 não atualizado com o resultado de 16/11 (~58 RPM).
 
-12. **Manual Técnico não documenta o gravador em RAM nem as ferramentas de dump.**
-    - Não há seção sobre `telemetry_recorder.h`, o comando `dump`, `capturar_dump.py`, `capturar_dump_wifi.py` ou o `--replay`.
-    - A seção 5 (Operação) menciona START/STOP e DOWNLOAD CSV, mas não o "Dump RAM" nem o teste no solo sem cabo.
-    - A seção 5.2 ainda diz "aguarda 5s para timeout" — esse comportamento foi desativado quando o Wi-Fi está conectado.
+12. ~~**Manual Técnico não documenta o gravador em RAM nem as ferramentas de dump.**~~ **ATENDIDO (19/11/2026)** — seção 5.3 (gravação em solo sem cabo), 5.4 (ESP-NOW) e a lista de comandos seriais (`s`/`t`/`g`/`d`/`p`/`x`/`r`) documentadas; os valores de 35 RPM, 0,7° e 2000 amostras foram corrigidos para **25 RPM, 5,7° e 1700 amostras**.
 
 13. **Diário com referências antigas a 89,5°.**
-    - Etapas 9–11 citam "corte em 89,5°" (valor vigente: 89,3° com `PIVO_ANTECIPACAO_GRAUS`).
-    - Como é um registro cronológico, pode ser intencional — mas convém uma nota de rodapé apontando o valor atual.
+    - Etapas 9–11 citam "corte em 89,5°"; as etapas 20–24 citam 89,3° com `PIVO_ANTECIPACAO_GRAUS = 0,7°`; **o valor vigente é corte em ~84° com antecipação de 5,7°** (Etapa 25).
+    - Como é um registro cronológico, é intencional — mas o TODO e o FSD passam a apontar o valor atual.
 
 14. **`diag_motor_curve/secrets.h` existe no disco e está ignorado pelo `.gitignore`.**
     - Correto do ponto de vista de segurança (`**/secrets.h`), mas o sketch não tinha um `secrets.h.example` próprio (o firmware V4 tem). **ATENDIDO (18/11/2026)** — `diag_motor_curve/secrets.h.example` criado.
@@ -136,6 +134,16 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 21. **O buffer do gravador é volátil.**
     - Se o robô reiniciar ou desligar antes do dump, os dados se perdem. Aceitável para esta etapa, mas vale registrar.
 
+22. **Escala de distância em aberto.**
+    - Os ticks dizem **503–504 mm** por lado de 500 mm (+0,7%); no chão o usuário mediu **480 mm** (−4%). Com a circunferência efetiva medida (205 mm) e `PPR_EFETIVO = 4320`, o esperado seria ~500 mm.
+    - Hipóteses: deslizamento na partida/chegada, ou `PPR_EFETIVO` real ≈ 4490.
+    - **Não afeta** a navegação nem o fechamento (7,8–8,7 mm), mas a escala do mapa e o alvo nominal de 500 mm ficam errados em ~4%.
+    - **Como fechar:** rodar o comando `📏 Reta 500` e medir no chão do ponto de partida à marca de parada, comparando com os ticks reportados.
+
+23. **Divergência IMU × odometria de ~5° por pivô.**
+    - Não afeta o controle (que usa a IMU), mas o painel `diag` e o `rumo odometria` do mapa carregam essa diferença. O alerta foi ajustado para o acumulado (> 30°).
+    - Provável causa: os encoders medem o giro **depois** do corte (a inércia não aparece nos ticks) e a escala de distância (item 22).
+
 ---
 
 ## 4. Sugestão de Ordem de Trabalho
@@ -155,5 +163,6 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 - **Código:** ausência de `esp_now` no firmware do robô confirmada por grep; `IMU_HABILITADA` sem referências; `PIN_BATTERY_ADC = -1` sem uso.
 - **Documentação:** valores confrontados entre `config.h`, FSD, Manual, Diário e README (itens 8–13).
 - **Git:** `git status` limpo exceto o PNG; `git ls-files` confirma que apenas `secrets.h.example` está rastreado (sem vazamento de credenciais).
-- **Compilação:** 1.042.211 bytes (79%) flash, 116.648 bytes (35%) RAM.
+- **Compilação:** 1.130.039 bytes (86%) flash, 120.864 bytes (36%) RAM.
 - **Funcional:** replay do dump testado (452 amostras → CSV com cabeçalho correto).
+- **Solo (19/11/2026):** quadrado com fechamento de 7,8–8,7 mm; pivôs 88,2–90,7°; mapa fechando em ~7 mm.

@@ -33,7 +33,7 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 #### 2.3 Escopo da Versão 4.0
 - **Dentro do Escopo:**
   - Trajetória quadrada de 4 lados (500 mm) e curvas pivô de 90° orientadas por IMU.
-  - Conectividade Wi-Fi Station com telemetria WebSocket assíncrona a 5 Hz.
+  - Conectividade Wi-Fi Station com telemetria WebSocket assíncrona (20 Hz em movimento / 2 Hz parado).
   - Dashboard Web embarcado em PROGMEM com gráficos em tempo real e exportação CSV.
   - Partida remota via WebSocket (botão START no navegador).
   - Compensação por feedforward proporcional à velocidade, a partir da curva PWM×RPM medida em bancada e corrigida pelo fator de carga do robô no solo (substitui o feedforward fixo de 110 µs).
@@ -97,7 +97,7 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 - O driver `imu_bmi160.h` fornece leitura de ângulo de guinada (yaw) e calibração de polaridade.
 - **Lógica de controle por delta real de yaw:** A cada início de segmento (reta ou curva), o firmware captura `g_yawStartSeg = imu.getYawAngleDeg()` e avalia o delta efetivamente girado (`deltaYaw = yawAtual − g_yawStartSeg`), com sinal preservado (horário = positivo). Isso elimina o disparo prematuro por resíduo de yaw da pausa anterior.
   - **Retas:** `sync_corr += deltaYaw * IMU_KP_YAW_RETA` — corrige desvio lateral aplicando diferencial de velocidade entre as rodas.
-  - **Curvas (pivô):** a IMU atua pelo critério de parada (`|deltaYaw| ≥ (ânguloAlvo − PIVO_ANTECIPACAO_GRAUS)`, corte em 89,3°) com guarda mínima de 200 ticks (`MIN_TICKS_PIVO`), garantindo a parada em ~90,0°; o sincronismo cruzado segue apenas pelos encoders.
+  - **Curvas (pivô):** a IMU atua pelo critério de parada (`|deltaYaw| ≥ (ânguloAlvo − PIVO_ANTECIPACAO_GRAUS)`, corte em ~84° com antecipação de 5,7°) com guarda mínima de 200 ticks (`MIN_TICKS_PIVO`), garantindo a parada em ~90,0°; o sincronismo cruzado segue apenas pelos encoders.
 - **Acelerômetro:** Inicializado pelo driver (ODR 100 Hz, faixa ±2 g), mas não lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura. Disponível para fusão sensorial futura (estimativa de inclinação ou detecção de colisão).
 
 ---
@@ -110,11 +110,11 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | **Diâmetro da Roda** | `DIAMETRO_RODA_MM` | `66.0f` | Roda real calibrada (circunferência de ~207,35 mm) |
 | **Velocidade de Cruzeiro** | `VELOCIDADE_CRUZEIRO_RPM` | `55.0f` | $\approx 190\text{ mm/s}$ nominal; ~58 RPM real medido em solo (feedforward por velocidade) |
 | **Velocidade Mínima de Rampa** | `VELOCIDADE_MIN_RPM` | `20.0f` | Garante torque inicial sem estolar o motor |
-| **Velocidade de Curva** | `VELOCIDADE_GIRO_RPM` | `35.0f` | $\approx 1,4\text{ s}$ por giro pivô de 90° (suavizado para evitar overshoot) |
+| **Velocidade de Curva** | `VELOCIDADE_GIRO_RPM` | `25.0f` | $\approx 1,65\text{ s}$ por giro pivô de 90°; mais lento = menos inércia de frenagem no corte |
 | **Rampa de Aceleração** | `RAMPA_ACEL_DIST_MM` | `50.0f` | Aceleração ágil ($\approx 600\text{ mm/s}^2$) sem patinar |
 | **Rampa de Desaceleração** | `RAMPA_DESACEL_DIST_MM` | `60.0f` | Frenagem progressiva cravada na marca |
 | **Rampa de Giro (Acel/Desacel)**| `RAMPA_CURVA_ACEL/DESACEL` | `10.0° / 15.0°` | Transição suave no pivô de 90° |
-| **Tolerância de Corte do Pivô** | `PIVO_ANTECIPACAO_GRAUS` | `0,7°` | Corte em 89,3°; calibração no solo deu 90,29° ± 0,54° (viés +0,29°) |
+| **Antecipação de Corte do Pivô** | `PIVO_ANTECIPACAO_GRAUS` | `5,7°` | Corte em ~84°; a inércia de frenagem (~5°) completa os 90°. Pivôs medidos em 88,2–90,7° (média ≈ 89,7°) |
 | **Guarda Mínima de Giro** | `MIN_TICKS_PIVO` | `200` | Evita corte prematuro por resíduo de yaw da pausa |
 | **Ganho Proporcional** | `PID_KP_M1`, `PID_KP_M2` | `1.8f` | Resposta rápida sem sobre-oscilação |
 | **Ganho Integral** | `PID_KI_M1`, `PID_KI_M2` | `1.5f` | Zera erro em regime permanente (0,6 → 1,5 após curva PWM×RPM) |
@@ -159,7 +159,18 @@ stateDiagram-v2
 * **v1.0.0 (Legado - `legacy/firmware_robo2wd/`):** Utilizava PWM via LEDC e leitura de encoders por interrupções de software (`attachInterrupt`). Apresentava gargalo de CPU e perda de pulsos.
 * **v2.0.0 (Legado - `legacy/firmware_robo2wd_v2/`):** Migrou para MCPWM e PCNT em hardware, comprovando a redução real de 1:90 ($4.320\text{ pulsos/volta}$) e introduzindo o sincronismo cruzado. Execução em loops bloqueantes dentro do `setup()`.
 * **v3.0.0 (Legado - `legacy/firmware_robo2wd_v3/`):** Arquitetura não-bloqueante no `loop()`, perfil trapezoidal e integração inicial da IMU BMI160 com telemetria por cabo serial.
-* **v4.0.0 (OFICIAL - `firmware_robo2wd_v4/`):** Telemetria sem fio contínua via Wi-Fi/WebSocket (5 Hz), Dashboard Web embarcado em PROGMEM, comandos START/STOP remotos, feedforward proporcional à velocidade por curva PWM×RPM calibrada (fator de carga 0,80), cruzeiro alvo 55 RPM (~58 RPM real em solo) e giro pivô com corte em 89,3° (parada em ~90,3°).
+* **v4.0.0 (OFICIAL - `firmware_robo2wd_v4/`):** Telemetria sem fio contínua via Wi-Fi/WebSocket (adaptativa: 20 Hz em movimento / 2 Hz parado), Dashboard Web embarcado em PROGMEM, comandos START/STOP remotos, feedforward proporcional à velocidade por curva PWM×RPM calibrada (fator de carga 0,80), cruzeiro alvo 55 RPM (~58 RPM real em solo) e giro pivô com **antecipação calibrada de 5,7°** (corte em ~84° + inércia ≈ 90°).
+
+## 📄 Atualizações Recentes (19/11/2026)
+
+- **`yawReal` (rumo real):** telemetria passa a reportar `yawReal = g_yawAbs + g_inerciaTotal` — os cortes **mais** a inércia de frenagem de **todos** os pivôs. O `yawAbs` é o rumo **congelado no corte**; sozinho ele esconde ~5–9° por pivô, que era exatamente o erro observado no solo (~15 cm / ~30°) que a telemetria não via.
+- **Inércia em acumuladores separados:** `inercia` (do segmento) e `inerciaOdom` (pelos encoders), integrados apenas na pausa. Somá-los ao rumo global corrompia o mapa, porque a IMU deriva ao parar os motores (~4,4° em 4 s na reta).
+- **Pivô recalibrado em solo:** `VELOCIDADE_GIRO_RPM` 35 → **25 RPM** e `PIVO_ANTECIPACAO_GRAUS` 0,7° → **5,7°**. A inércia cresce quando se antecipa o corte; o ponto ótimo medido foi 5,7° + 25 RPM (giro real 90,3°).
+- **Diagnóstico:** `g_yawOdom` (odometria com sinal), `diverg` (IMU × encoders, alerta acumulado > 30°) e `gyroBias` com **autoteste no boot** (limiar de ruído 0,25 °/s).
+- **Comandos de bancada:** `reta` (`t`) e `pivô` (`g`), com botões `📏 Reta 500` e `🔄 Pivô 90` no dashboard.
+- **Dashboard:** o rastro do mapa usa o **rumo real**; o CSV exportado ganha `yawReal` e `inercia`.
+- **Wi-Fi:** reconexão automática no `loop()` (antes `g_wifiOk` era setado uma única vez no `setup()`).
+- **Gravador:** 1984 → **1700** amostras (40 bytes) por limite de DRAM.
 
 ## 📄 Atualizações Recentes (16/11/2026)
 

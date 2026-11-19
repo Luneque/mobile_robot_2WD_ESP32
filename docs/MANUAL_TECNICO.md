@@ -13,11 +13,11 @@
 Este projeto consiste em uma plataforma robótica móvel de tração diferencial (2WD) baseada no microcontrolador **ESP32-D0WD-V3**. O sistema executa trajetórias de alta precisão com realimentação em malha fechada (PID), perfil de velocidade trapezoidal, compensação de zona morta por feedforward e sincronismo dinâmico entre rodas (*cross-coupling*), integrado com uma IMU Bosch BMI160.
 
 A versão oficial do firmware (**Versão 4**) opera com:
-* **Conectividade Sem Fio e Telemetria em Tempo Real:** Wi-Fi Station, WebSocket Server a 5 Hz e Dashboard Web embarcado em memória flash (servido em `http://robo.local/`), permitindo visualização de gráficos de alta frequência e disparo remoto sem cabos.
+* **Conectividade Sem Fio e Telemetria em Tempo Real:** Wi-Fi Station, WebSocket Server com telemetria adaptativa (20 Hz em movimento / 2 Hz parado) e Dashboard Web embarcado em memória flash (servido em `http://robo.local/`), permitindo visualização de gráficos de alta frequência e disparo remoto sem cabos.
 * **Gateway ESP-NOW:** Suporte ao microcontrolador auxiliar ESP32-S3 Super Mini para transmissão de telemetria sem necessidade de ponto de acesso Wi-Fi.
 * **Periféricos de Silício Dedicados:** **MCPWM** (50 Hz / resolução de $1\,\mu\text{s}$) e **PCNT** (decodificação de quadratura 4x por hardware com filtro anti-glitch de 1000 ns).
 * **Compensação Dinâmica de Zona Morta:** Feedforward proporcional à velocidade, derivado da curva PWM×RPM medida em bancada e corrigido pelo fator de carga do robô no solo (`CURVA_FATOR_CARGA = 0.80`), vencendo o atrito estático já na partida.
-* **Fusão Sensorial com IMU BMI160:** Correção contínua de rumo em linha reta (`IMU_KP_YAW_RETA = 2.0`) e controle estrito de parada de giro pivô por delta de yaw (corte em 89,3°).
+* **Fusão Sensorial com IMU BMI160:** Correção contínua de rumo em linha reta (`IMU_KP_YAW_RETA = 2.0`) e controle estrito de parada de giro pivô por delta de yaw (corte em ~84° com antecipação de 5,7°).
 
 ---
 
@@ -89,12 +89,12 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 ### 4.1 Módulos do Sistema
 * **[`config.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/config.h):** Centraliza pinos, limites de pulso do ESC ($1150\,\mu\text{s}$ a $1850\,\mu\text{s}$), parâmetros cinemáticos (roda de 66 mm), distâncias de rampa, parâmetros do WDT e ganhos de fusão com a IMU (`IMU_KP_YAW_RETA = 2.0`) e sincronismo cruzado (`K_SYNC = 0.15`).
 * **[`wifi_telemetry.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/wifi_telemetry.h):** Driver de conectividade Wi-Fi Station, servidor WebSocket (porta 81) e servidor HTTP (porta 80). Contém o Dashboard Web embarcado em PROGMEM com gráficos Chart.js e visualizador 2D da trajetória em tempo real (HTML5 Canvas).
-* **[`imu_bmi160.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/imu_bmi160.h):** Driver nativo I2C (400 kHz) para a IMU Bosch BMI160. Fornece calibração estática de *bias* do giroscópio, leitura direta do eixo Z (giro horário = Yaw positivo) e integração de ângulo de guinada (*Yaw*). O firmware usa o delta real de yaw (`deltaYaw = yawAtual − g_yawStartSeg`, capturado no início de cada segmento) para correção de rumo em retas (`IMU_KP_YAW_RETA = 2.0`). No pivô, a IMU atua pelo critério de parada (`|deltaYaw| ≥ (ânguloAlvo − PIVO_ANTECIPACAO_GRAUS)`, corte em 89,3°) com guarda mínima de 200 ticks (`MIN_TICKS_PIVO`) para evitar disparos prematuros por resíduo de yaw; o sincronismo cruzado é feito apenas pelos encoders. O acelerômetro é inicializado pelo driver (ODR 100 Hz, ±2 g), mas não é lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura.
+* **[`imu_bmi160.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/imu_bmi160.h):** Driver nativo I2C (400 kHz) para a IMU Bosch BMI160. Fornece calibração estática de *bias* do giroscópio, leitura direta do eixo Z (giro horário = Yaw positivo) e integração de ângulo de guinada (*Yaw*). O firmware usa o delta real de yaw (`deltaYaw = yawAtual − g_yawStartSeg`, capturado no início de cada segmento) para correção de rumo em retas (`IMU_KP_YAW_RETA = 2.0`). No pivô, a IMU atua pelo critério de parada (`|deltaYaw| ≥ (ânguloAlvo − PIVO_ANTECIPACAO_GRAUS)`, corte em ~84° com antecipação calibrada de 5,7°) com guarda mínima de 200 ticks (`MIN_TICKS_PIVO`) para evitar disparos prematuros por resíduo de yaw; o sincronismo cruzado é feito apenas pelos encoders. O acelerômetro é inicializado pelo driver (ODR 100 Hz, ±2 g), mas não é lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura.
 * **[`motor_control_mcpwm.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/motor_control_mcpwm.h):** Gerador determinístico de PWM a 50 Hz com resolução de $1\,\mu\text{s}$ via timer de 1 MHz.
 * **[`encoder_reader_pcnt.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/encoder_reader_pcnt.h):** Decodificador de pulsos com filtro anti-glitch de 1000 ns e filtro exponencial de velocidade (EMA).
 * **[`pid_controller.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/pid_controller.h):** Controlador PID com anti-windup e feedforward proporcional à velocidade, obtido por interpolação da curva PWM×RPM medida em bancada (`diag_motor_curve`) e corrigido pelo fator de carga (`CURVA_FATOR_CARGA`).
-* **`telemetry_recorder.h`:** Gravador de telemetria em RAM (2000 amostras a 20 Hz, 100 s), com dump por Serial (`d`) ou via WebSocket/ESP-NOW (`dump`). Permite testar o robô no solo sem cabo.
-* **`espnow_link.h`:** Enlace ESP-NOW com o gateway ESP32-S3. Envia a telemetria em JSON (5 Hz) e recebe comandos de texto. Compatível com ESP-IDF v4 e v5. O dump do gravador é devolvido pelo canal que recebeu o pedido.
+* **`telemetry_recorder.h`:** Gravador de telemetria em RAM (1700 amostras a 20 Hz, 85 s, 40 bytes por amostra), com dump por Serial (`d`) ou via WebSocket/ESP-NOW (`dump`). Permite testar o robô no solo sem cabo.
+* **`espnow_link.h`:** Enlace ESP-NOW com o gateway ESP32-S3. Envia a telemetria em JSON (20 Hz em movimento / 2 Hz parado) e recebe comandos de texto. Compatível com ESP-IDF v4 e v5. O dump do gravador é devolvido pelo canal que recebeu o pedido.
 * **`firmware_robo2wd_v4.ino`:** Máquina de estados não-bloqueante (`ESTADO_AGUARDO_INICIO`, `ESTADO_EXECUTANDO_TRAJETORIA`, `ESTADO_CONCLUIDO`, `ESTADO_EMERGENCIA`), perfil trapezoidal, fusão sensorial IMU + Encoders e dispatch centralizado de comandos.
 
 ### 4.2 Dinâmica do Perfil Trapezoidal
@@ -104,8 +104,9 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
   * Desacelera nos últimos **60 mm** para parada cravada na marca de 500 mm (10.417 ticks).
   * Tempo total por reta: **$\approx 3,7\text{ s}$** medido em solo (com feedforward por velocidade).
 * **Curva Pivô (90°):**
-  * Acelera em 10° e desacelera em 15°, com cruzeiro suavizado de **35 RPM** no giro pivô.
-  * Tempo total por giro: **$\approx 1,65\text{ s}$** de movimento + 0,8 s de pausa = **$\approx 2,45\text{ s}$** (medido em solo; corte em 89,3° com antecipação de 0,7°).
+  * Acelera em 10° e desacelera em 15°, com cruzeiro suavizado de **25 RPM** no giro pivô.
+  * Corte em ~84° com **antecipação calibrada de 5,7°** (`PIVO_ANTECIPACAO_GRAUS`); a **inércia de frenagem** (~5°) completa os ~90°.
+  * Tempo total por giro: **$\approx 1,65\text{ s}$** de movimento + 0,8 s de pausa = **$\approx 2,45\text{ s}$** (medido em solo).
 
 ---
 
@@ -121,7 +122,7 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 4. No PC ou celular na mesma rede, abra:
    * **`http://robo.local/`** (ou o IP atribuído, ex: `http://192.168.1.102/`).
 5. O painel exibirá:
-   * **Mapa 2D da Trajetória:** Sobreposição do quadrado ideal de 500×500 mm (azul tracejado) com o rastro real do robô (verde contínuo), marcador do robô e vetor de direção atualizados em tempo real (20 Hz no movimento). Inclui coordenadas instantâneas $(X, Y)$ em mm e ângulo $\theta$ em graus, além de botão para reset manual do rastro.
+   * **Mapa 2D da Trajetória:** Sobreposição do quadrado ideal de 500×500 mm (azul tracejado) com o rastro real do robô (verde contínuo), marcador do robô e vetor de direção atualizados em tempo real (20 Hz no movimento). O rastro é integrado com o **rumo real** (`yawReal` = corte + inércia de frenagem), e não com o rumo congelado no corte — sem isso o traçado sai torto ~5° por pivô. Inclui coordenadas instantâneas $(X, Y)$ em mm e ângulo $\theta$ em graus, além de botão para reset manual do rastro.
    * **Gráficos em Tempo Real:** RPM (Esquerda/Direita), Yaw (graus) e pulsos de PWM ($\mu\text{s}$).
 6. Posicione o robô no solo e clique no botão verde **START** para iniciar a trajetória quadrada.
 7. A qualquer momento, envie comando de parada remota pelo painel para interromper o movimento.
@@ -129,11 +130,11 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 
 ### 5.2 Operação Local via Cabo Serial (Fallback de Bancada)
 1. Conecte o robô via USB (`COM9`) e abra o monitor serial em **115200 baud**.
-2. O robô aceita o envio de **`s`** ou **`g`** pela serial para início manual.
+2. O robô aceita o envio de **`s`** (start), **`t`** (reta única de 500 mm), **`g`** (pivô único de 90°), **`d`** (dump), **`p`** (pause), **`x`** (stop) e **`r`** (reset) pela serial.
    * O *timeout* automático de 5 s só dispara quando o Wi-Fi **não** está conectado; com Wi-Fi ativo, o início é remoto.
 
 ### 5.3 Gravação e Leitura de Telemetria em Solo (sem cabo)
-O robô grava telemetria em RAM a 20 Hz (2000 amostras, 100 s) — ideal para teste no solo, onde o cabo não pode ficar conectado.
+O robô grava telemetria em RAM a 20 Hz (1700 amostras, 85 s) — ideal para teste no solo, onde o cabo não pode ficar conectado.
 
 1. **Iniciar a trajetória:** botão **START** no dashboard, ou `start` via WebSocket/ESP-NOW.
 2. **Despejar o buffer:** envie `dump` pelo dashboard, por um dos scripts abaixo, ou `d` na serial.
@@ -173,6 +174,21 @@ O robô grava telemetria em RAM a 20 Hz (2000 amostras, 100 s) — ideal para te
 ```powershell
 & "C:\Users\luneque.junior\AppData\Local\Arduino15\packages\esp32\tools\esptool_py\5.3.1\esptool.exe" --chip esp32 --port COM9 --baud 921600 --before default-reset --after hard-reset write_flash -z --flash-mode dio --flash-freq 80m --flash-size 4MB 0x1000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.bootloader.bin" 0x8000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.partitions.bin" 0xe000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\boot_app0.bin" 0x10000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.bin"
 ```
+
+## 📄 Atualizações Recentes (19/11/2026)
+
+### Firmware
+- **`yawReal` (rumo real):** `g_yawAbs + g_inerciaTotal` — os cortes **mais** a inércia de frenagem de todos os pivôs. O `yawAbs` é o rumo **congelado no corte** e esconde ~5–9° por pivô.
+- **Pivô recalibrado em solo:** `VELOCIDADE_GIRO_RPM` 35 → **25 RPM** e `PIVO_ANTECIPACAO_GRAUS` 0,7° → **5,7°**.
+- **Diagnóstico:** `g_yawOdom`, `diverg`, `gyroBias` com autoteste no boot, `inercia`/`inerciaOdom` em acumuladores separados.
+- **Comandos de bancada:** `📏 Reta 500` (`t`) e `🔄 Pivô 90` (`g`), com botões no dashboard.
+- **Wi-Fi:** reconexão automática no `loop()`.
+- **Gravador:** 1984 → **1700** amostras (as colunas de diagnóstico estouraram o DRAM).
+
+### Dashboard
+- O rastro do mapa usa o **rumo real** (`yawReal`), com fallback para `yawAbs` em firmware antigo.
+- Alerta de divergência: limiar 5° → **30°** (a divergência acumulada é normal, ~5° por pivô).
+- CSV exportado ganha `yawReal` e `inercia`.
 
 ## 📄 Atualizações Recentes (13/11/2026)
 
