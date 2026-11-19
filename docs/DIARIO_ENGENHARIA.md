@@ -91,7 +91,7 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
   * **Driver `wifi_telemetry.h`:** Integração do rádio Wi-Fi (modo Station na rede local) com servidor HTTP (porta 80), mDNS (`http://robo.local/`) e servidor WebSocket assíncrono (porta 81).
   * **Dashboard Web Embarcado:** Interface HTML/JS com dark theme em memória flash (PROGMEM), renderizando gráficos em tempo real com Chart.js (janela de 15s), botões de comando remoto (**START**) e exportação instantânea de dados em CSV.
   * **Partida Remota Segura:** O robô pode ser disparado remotamente pelo navegador via WebSocket sem cabo de dados conectado.
-  * **Ponte ESP-NOW (`gateway_espnow/`):** Firmware dedicado para o microcontrolador ESP32-S3 Super Mini para permitir telemetria transparente via rádio 2.4 GHz em campo aberto sem roteador Wi-Fi.
+  * **Ponte ESP-NOW (`gateway_espnow/`):** Firmware dedicado para um microcontrolador ESP32 auxiliar permitir telemetria transparente via rádio 2.4 GHz em campo aberto sem roteador Wi-Fi.
   * **Ferramenta PC (`robo_monitor/`):** Script `robo_ws_logger.py` para monitoramento no terminal via biblioteca `rich` e salvamento automático de logs em CSV.
 * **Calibração Dinâmica Pós-Telemetria em Solo:**
   * **Problema diagnosticado no CSV 1:** O robô ficava ~3,0 s parado no início de cada reta vencendo atrito estático com o feedforward original de 50 µs (`ESC_DEADBAND_US`).
@@ -193,13 +193,13 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 * **Problema:** a FSD declarava o ESP-NOW como parte da versão oficial e o gateway existia, mas o firmware do robô **não tinha** nenhum código ESP-NOW (0 referências a `esp_now`). A especificação prometia uma funcionalidade inexistente.
 * **Implementação (`espnow_link.h`):**
-  * Enlace bidirecional com o gateway ESP32-S3: o robô envia a mesma telemetria em JSON (5 Hz, via `snprintf` em buffer de 200 bytes) e recebe comandos de texto.
+  * Enlace bidirecional com o gateway ESP32: o robô envia a mesma telemetria em JSON (5 Hz, via `snprintf` em buffer de 200 bytes) e recebe comandos de texto.
   * Compatível com ESP-IDF v4 e v5 — a assinatura do callback de envio mudou no core 3.x (`(mac, status)` → `(tx_info, status)`); há guarda por `ESP_IDF_VERSION_MAJOR`.
   * Canal configurável (`ESPNOW_CHANNEL`), peer registrado e fallback em broadcast.
 * **Integração:** os comandos `start`/`stop`/`pause`/`reset`/`dump` passaram a ser aceitos por **WebSocket e ESP-NOW**, com dispatch centralizado (um único ponto de consumo de cada flag). O dump do gravador é devolvido pelo canal que recebeu o pedido.
 * **Ferramenta `robo_monitor/gateway_espnow.py`:** ponte serial do gateway, aceita os cinco comandos pelo teclado, grava a telemetria em CSV e trata `TELEM:`/`MAC:`/`DBG:`.
 * **Custo:** +9,5 KB de flash (1.051.735 bytes, 80%); RAM inalterada em 116.808 bytes (35%).
-* **Pendência de validação:** o enlace ainda não foi testado de ponta a ponta com o hardware do gateway (há apenas um ESP32 disponível; o ESP32-S3 não estava conectado).
+* **Pendência de validação:** o enlace ainda não foi testado de ponta a ponta com o hardware do gateway (há apenas um ESP32 disponível; o ESP32 não estava conectado).
 
 * **Resultado da validação ponta a ponta (16/11/2026, gateway ESP32 clássico em COM18):**
 
@@ -447,7 +447,7 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 
 ### 26. Resumo da Estrutura Atual do Repositório
 * **`firmware_robo2wd_v4/`:** **Versão Oficial Atual e Ativa** (Wi-Fi, WebSocket, Dashboard Web e Fusão IMU).
-* **`gateway_espnow/`:** Firmware de gateway para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB).
+* **`gateway_espnow/`:** Firmware de gateway para ESP32 (Ponte ESP-NOW <-> USB).
 * **`robo_monitor/`:** Ferramentas Python de recepção, visualização e armazenamento de telemetria.
 * **`legacy/`:** Contém as versões históricas preservadas:
   * `firmware_robo2wd/` (Versão 1 — software ISRs);

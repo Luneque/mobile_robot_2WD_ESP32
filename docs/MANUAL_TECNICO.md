@@ -14,7 +14,7 @@ Este projeto consiste em uma plataforma robótica móvel de tração diferencial
 
 A versão oficial do firmware (**Versão 4**) opera com:
 * **Conectividade Sem Fio e Telemetria em Tempo Real:** Wi-Fi Station, WebSocket Server com telemetria adaptativa (20 Hz em movimento / 2 Hz parado) e Dashboard Web embarcado em memória flash (servido em `http://robo.local/`), permitindo visualização de gráficos de alta frequência e disparo remoto sem cabos.
-* **Gateway ESP-NOW:** Suporte ao microcontrolador auxiliar ESP32-S3 Super Mini para transmissão de telemetria sem necessidade de ponto de acesso Wi-Fi.
+* **Gateway ESP-NOW:** Suporte a um microcontrolador auxiliar ESP32 para transmissão de telemetria sem necessidade de ponto de acesso Wi-Fi.
 * **Periféricos de Silício Dedicados:** **MCPWM** (50 Hz / resolução de $1\,\mu\text{s}$) e **PCNT** (decodificação de quadratura 4x por hardware com filtro anti-glitch de 1000 ns).
 * **Compensação Dinâmica de Zona Morta:** Feedforward proporcional à velocidade, derivado da curva PWM×RPM medida em bancada e corrigido pelo fator de carga do robô no solo (`CURVA_FATOR_CARGA = 0.80`), vencendo o atrito estático já na partida.
 * **Fusão Sensorial com IMU BMI160:** Correção contínua de rumo em linha reta (`IMU_KP_YAW_RETA = 2.0`) e controle estrito de parada de giro pivô por delta de yaw (corte em ~84° com antecipação de 5,7°).
@@ -94,7 +94,7 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 * **[`encoder_reader_pcnt.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/encoder_reader_pcnt.h):** Decodificador de pulsos com filtro anti-glitch de 1000 ns e filtro exponencial de velocidade (EMA).
 * **[`pid_controller.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/pid_controller.h):** Controlador PID com anti-windup e feedforward proporcional à velocidade, obtido por interpolação da curva PWM×RPM medida em bancada (`diag_motor_curve`) e corrigido pelo fator de carga (`CURVA_FATOR_CARGA`).
 * **`telemetry_recorder.h`:** Gravador de telemetria em RAM (1700 amostras a 20 Hz, 85 s, 40 bytes por amostra), com dump por Serial (`d`) ou via WebSocket/ESP-NOW (`dump`). Permite testar o robô no solo sem cabo.
-* **`espnow_link.h`:** Enlace ESP-NOW com o gateway ESP32-S3. Envia a telemetria em JSON (20 Hz em movimento / 2 Hz parado) e recebe comandos de texto. Compatível com ESP-IDF v4 e v5. O dump do gravador é devolvido pelo canal que recebeu o pedido.
+* **`espnow_link.h`:** Enlace ESP-NOW com o gateway ESP32. Envia a telemetria em JSON (20 Hz em movimento / 2 Hz parado) e recebe comandos de texto. Compatível com ESP-IDF v4 e v5. O dump do gravador é devolvido pelo canal que recebeu o pedido.
 * **`firmware_robo2wd_v4.ino`:** Máquina de estados não-bloqueante (`ESTADO_AGUARDO_INICIO`, `ESTADO_EXECUTANDO_TRAJETORIA`, `ESTADO_CONCLUIDO`, `ESTADO_EMERGENCIA`), perfil trapezoidal, fusão sensorial IMU + Encoders e dispatch centralizado de comandos.
 
 ### 4.2 Dinâmica do Perfil Trapezoidal
@@ -152,8 +152,9 @@ O robô grava telemetria em RAM a 20 Hz (1700 amostras, 85 s) — ideal para tes
    ```
 6. **Atenção:** o buffer é volátil — o dump deve ser feito **antes** de desligar/reiniciar o robô.
 
-### 5.4 Operação via ESP-NOW (Gateway ESP32-S3)
-1. Grave `gateway_espnow/gateway_espnow.ino` no ESP32-S3 e anote o MAC impresso no Serial.
+### 5.4 Operação via ESP-NOW (Gateway ESP32)
+> **Hardware validado:** um **ESP32 clássico** (ESP-WROOM-32, fqbn `esp32:esp32:esp32`, porta `COM18`). O ESP32-S3 era o plano original, mas a placa apresentou defeito e não chegou a ser usado. O código é de placa genérica e roda em qualquer ESP32.
+1. Grave `gateway_espnow/gateway_espnow.ino` no ESP32 auxiliar e anote o MAC impresso no Serial.
 2. Ajuste `ESPNOW_CHANNEL` em `config.h` do robô para o mesmo canal do gateway.
 3. Conecte o gateway ao PC e execute a ponte:
    ```

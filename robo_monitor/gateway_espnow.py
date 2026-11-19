@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""gateway_espnow.py — Ponte ESP-NOW (gateway ESP32-S3) <-> PC
+"""gateway_espnow.py — Ponte ESP-NOW (gateway ESP32) <-> PC
 
-Conecta à porta serial do gateway ESP32-S3 (gravado com gateway_espnow.ino) e:
+Conecta à porta serial do gateway ESP32 (gravado com gateway_espnow.ino) e:
   - encaminha telemetria recebida ("TELEM:{json}") para o stdout e para CSV;
   - aceita comandos do PC e os envia ao robô no formato "CMD:<payload>".
 
@@ -166,7 +166,7 @@ class GatewayPonte:
 
 
 def main():
-    p = argparse.ArgumentParser(description="Ponte ESP-NOW: gateway ESP32-S3 <-> PC")
+    p = argparse.ArgumentParser(description="Ponte ESP-NOW: gateway ESP32 <-> PC")
     p.add_argument("--port", default="COM9", help="Porta serial do gateway (padrão: COM9)")
     p.add_argument("--baud", type=int, default=115200)
     p.add_argument("--csv", default="telemetria_espnow.csv", help="CSV de saída")

@@ -1,7 +1,7 @@
 /**
  * espnow_link.h — Enlace ESP-NOW do robô (V4)
  *
- * Ponte com o gateway ESP32-S3 (gateway_espnow/): o robô envia telemetria em
+ * Ponte com o gateway ESP32 (gateway_espnow/): o robô envia telemetria em
  * JSON e recebe comandos de texto (start/stop/pause/reset/dump), funcionando
  * como redundância ou alternativa ao Wi-Fi/WebSocket.
  *

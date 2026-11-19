@@ -149,7 +149,7 @@
 #define TELEM_INTERVAL_IDLE_MS  500         // 2 Hz em AGUARDO/CONCLUIDO
 
 // ==========================================
-// 8. ESP-NOW (Gateway ESP32-S3 Super Mini)
+// 8. ESP-NOW (Gateway ESP32 auxiliar)
 // ==========================================
 // Canal do enlace ESP-NOW: o robô NÃO fixa canal — ele usa o canal atual da
 // interface Wi-Fi (peer registrado com canal 0), que é o canal do AP quando

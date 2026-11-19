@@ -17,7 +17,7 @@
 //  7. Wi-Fi Station Mode com dashboard WebSocket em tempo real (robo.local).
 //  8. Comandos de início/parada recebidos via WebSocket (sem cabo serial).
 //  9. Telemetria JSON a 5 Hz: RPM, Yaw, ticks, PWM, estado da FSM.
-// 10. Preparado para ESP-NOW (gateway ESP32-S3 como fallback sem Wi-Fi).
+// 10. Preparado para ESP-NOW (gateway ESP32 como fallback sem Wi-Fi).
 // =========================================================================
 
 MotorControlMCPWM motors;
@@ -32,7 +32,7 @@ bool g_wifiOk = false;
 uint32_t g_ultimaTentativaWifi = 0;   // controle da reconexao automatica
 uint32_t g_lastTelemTime = 0;
 
-// Enlace ESP-NOW com o gateway ESP32-S3 (redundancia/alternativa ao Wi-Fi)
+// Enlace ESP-NOW com o gateway ESP32 (redundancia/alternativa ao Wi-Fi)
 EspNowLink espnow;
 bool g_espnowOk = false;
 uint32_t g_lastEspnowTelem = 0;
@@ -444,7 +444,7 @@ void enviarTelemetria(uint32_t now) {
 // =========================================================================
 // TELEMETRIA ESP-NOW (redundancia/alternativa ao Wi-Fi)
 // =========================================================================
-// Serializa o mesmo pacote em JSON e envia ao gateway ESP32-S3.
+// Serializa o mesmo pacote em JSON e envia ao gateway ESP32.
 void enviarTelemEspNow(uint32_t now) {
     if (!g_espnowOk) return;
     // Mesma taxa adaptativa da telemetria WebSocket (20 Hz em movimento,

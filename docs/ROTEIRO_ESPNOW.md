@@ -1,6 +1,6 @@
 # Roteiro de Validação do Enlace ESP-NOW
 
-Validar a ponte **robô (ESP32) ↔ gateway (ESP32-S3) ↔ PC**. Pré-requisito: o
+Validar a ponte **robô (ESP32) ↔ gateway (ESP32) ↔ PC**. Pré-requisito: o
 gateway compilado e gravado, e o robô com o firmware V4 (já validado em bancada).
 
 Tempo estimado: ~20 min.
@@ -9,9 +9,9 @@ Tempo estimado: ~20 min.
 
 ## 0. Pré-requisitos
 
-- [ ] ESP32-S3 Super Mini disponível (além do ESP32 do robô).
-- [ ] Cabo USB para o ESP32-S3.
-- [ ] `gateway_espnow/gateway_espnow.ino` compilado (validado: 885.416 bytes, 67% flash).
+- [ ] Um ESP32 auxiliar disponível (além do ESP32 do robô). O gateway **validado** foi um ESP-WROOM-32 clássico.
+- [ ] Cabo USB para o ESP32.
+- [ ] `gateway_espnow/gateway_espnow.ino` compilado (validado: 885.292 bytes, 67% flash).
 - [ ] Robô com o firmware V4 gravado e no Wi-Fi (`robo.local`).
 - [ ] Python com `pyserial` e `websockets`: `python -m pip install pyserial websockets rich`.
 
@@ -25,11 +25,11 @@ Esperado: uma porta para o robô (ex.: `COM9`) e outra para o gateway (ex.: `COM
 
 ---
 
-## 1. Gravar o gateway no ESP32-S3
+## 1. Gravar o gateway no ESP32
 
 1. Abra `gateway_espnow/gateway_espnow.ino` na Arduino IDE.
-2. Placa: **ESP32S3 Dev Module** (ou "LOLIN S3 Mini").
-3. Selecione a porta do ESP32-S3 e grave.
+2. Placa: **ESP32 Dev Module** (o gateway validado foi um ESP-WROOM-32 clássico, em `COM18`).
+3. Selecione a porta do ESP32 e grave.
 4. Abra o Monitor Serial em **115200 baud** e confira:
 
 ```

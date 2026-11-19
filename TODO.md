@@ -31,7 +31,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 ### [P1] Funcionalidades declaradas mas não implementadas
 
 1. ~~**ESP-NOW: lado do robô não existe.**~~ **ATENDIDO E VALIDADO (16/11/2026).**
-   - Implementado em `espnow_link.h`: telemetria JSON ao gateway ESP32-S3 (5 Hz) e recepção de `start`/`stop`/`pause`/`reset`/`dump`.
+   - Implementado em `espnow_link.h`: telemetria JSON ao gateway ESP32 (5 Hz) e recepção de `start`/`stop`/`pause`/`reset`/`dump`.
    - Comandos aceitos por WebSocket **e** ESP-NOW, com dispatch centralizado; o dump é devolvido pelo canal que recebeu o pedido.
    - Adicionada a ponte `robo_monitor/gateway_espnow.py` (serial do gateway, grava CSV).
    - **Validado de ponta a ponta** com gateway ESP32 clássico (COM18): robô→gateway 1472 pacotes/40 s; `CMD:start` confirmado e robô executou; dump devolvido com 443 amostras (RETA→CONCLUIDO). Números do dump idênticos aos do Wi-Fi (pico 58,8 RPM, pivôs 89,6–90,7°, desvio 0,40°).
@@ -45,7 +45,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
    - **Adiado por decisão do usuário (16/11/2026).** Projeto já levantado: divisor R1=100k/R2=47k em GPIO 34 (ADC1_CH6), `ADC_11db`, fundo de escala ~2,5 V, limiares 7,0 V (atenção) / 6,6 V (corte, 3,30 V/célula), telemetria `vbat` + corte em `ESTADO_EMERGENCIA`. Pendência: divisor não está montado; calibração com multímetro é obrigatória.
 
 3. **Sem proteção de baixa tensão / sem telemetria de corrente.**
-   - Relacionado ao item anterior. O ESC é brushless de 2-3S; operar abaixo de ~6,4 V danifica a célula.
+   - Relacionado ao item anterior. O ESC é escovado (bidirecional duplo) de 2-3S; operar abaixo de ~6,4 V danifica a célula.
 
 ### [P2] Robustez e qualidade
 
@@ -148,7 +148,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 
 ## 4. Sugestão de Ordem de Trabalho
 
-1. ~~**[P1]** Decidir o destino do ESP-NOW~~ — **atendido**: implementado o lado do robô (`espnow_link.h`) + ponte `gateway_espnow.py`. Resta validar com o ESP32-S3 e, se desejado, trocar broadcast por MAC dedicado.
+1. ~~**[P1]** Decidir o destino do ESP-NOW~~ — **atendido**: implementado o lado do robô (`espnow_link.h`) + ponte `gateway_espnow.py`. **Validado com um ESP32 clássico** (ESP-WROOM-32, `COM18`); o ESP32-S3 era o plano original, mas a placa apresentou defeito. Resta, se desejado, trocar broadcast por MAC dedicado.
 2. **[P1]** Monitor de bateria (hardware + `PIN_BATTERY_ADC` + alerta/telemetria).
 3. ~~**[P2]** Chart.js local (baixar o arquivo para PROGMEM ou servir do SPIFFS).~~ **ATENDIDO (17/11/2026)** — servido de `/chartjs.min.js` pelo próprio ESP32 (gzip em PROGMEM).
 4. ~~**[P2]** Mapa 2D com orientação real medida (remover `baseDeg` nominal).~~ **ATENDIDO (17/11/2026)** — ver item 5 dos problemas de fundo.

@@ -1,16 +1,20 @@
 // =========================================================================
-// GATEWAY ESP-NOW — ESP32-S3 Super Mini
+// GATEWAY ESP-NOW — ESP32 (placa auxiliar)
 // Ponte bidirecional: ESP-NOW (robô) <-> Serial USB (PC)
 // =========================================================================
 // INSTRUÇÕES DE USO:
-// 1. Grave este firmware no ESP32-S3 Super Mini via Arduino IDE.
-//    Placa: "ESP32S3 Dev Module" (ou "LOLIN S3 Mini" se disponível).
+// 1. Grave este firmware em um ESP32 auxiliar via Arduino IDE.
+//    Placa: "ESP32 Dev Module".
+//    O gateway VALIDADO foi um ESP-WROOM-32 classico (fqbn esp32:esp32:esp32).
+//    O ESP32-S3 era o plano original, mas a placa apresentou defeito e nao
+//    chegou a ser usado. O codigo e' de placa generica e roda em qualquer
+//    ESP32 (classico, S3, C3...).
 //    Selecione a porta USB correta.
 // 2. Após a gravação, abra o Monitor Serial (115200 baud) e anote o MAC
 //    impresso na inicialização. Ex: "MAC: AA:BB:CC:DD:EE:FF"
 // 3. Cole o MAC no firmware V4 do robô em config.h:
 //    #define ESPNOW_GATEWAY_MAC {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}
-// 4. Conecte o ESP32-S3 ao PC via USB. Rode o Python logger apontando
+// 4. Conecte o gateway ao PC via USB. Rode o Python logger apontando
 //    para a porta COM deste gateway.
 // =========================================================================
 //

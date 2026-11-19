@@ -2,7 +2,7 @@
 
 Este repositório contém o firmware embarcado, as ferramentas de diagnóstico, monitoramento sem fio e a documentação de engenharia para um robô móvel de tração diferencial (2WD) baseado no microcontrolador **ESP32-D0WD-V3**.
 
-O sistema executa com extrema repetibilidade e controle em malha fechada uma trajetória de teste quadrada fechada (500 mm por lado com curvas de 90° em pivô central orientadas por IMU), agora com **telemetria bidirecional em tempo real via Wi-Fi/WebSocket**, **dashboard web embarcado** e **ponte ESP-NOW para ESP32-S3**.
+O sistema executa com extrema repetibilidade e controle em malha fechada uma trajetória de teste quadrada fechada (500 mm por lado com curvas de 90° em pivô central orientadas por IMU), agora com **telemetria bidirecional em tempo real via Wi-Fi/WebSocket**, **dashboard web embarcado** e **ponte ESP-NOW para ESP32**.
 
 ---
 
@@ -17,7 +17,7 @@ O sistema executa com extrema repetibilidade e controle em malha fechada uma tra
 * **Conectividade Sem Fio e Telemetria em Tempo Real:**
   * **Wi-Fi Station & WebSocket Server (telemetria adaptativa: 20 Hz em movimento / 2 Hz parado):** Transmissão contínua de telemetria completa (RPM alvo/real, pulsos de encoders, ângulo de Yaw da IMU, comandos PWM e estados da FSM).
   * **Dashboard Web Embarcado (PROGMEM):** Acessível diretamente pelo navegador via `http://robo.local/` ou pelo IP local, com gráficos em tempo real (Chart.js), visualização de estado, disparo remoto de trajetória e exportação direta para CSV.
-  * **Ponte ESP-NOW (ESP32-S3 Super Mini):** Firmware dedicado em `gateway_espnow/` para operação transparente via rádio 2.4 GHz em campo ou bancada sem necessidade de roteador Wi-Fi.
+  * **Ponte ESP-NOW (gateway ESP32):** Firmware dedicado em `gateway_espnow/` para operação transparente via rádio 2.4 GHz em campo ou bancada sem necessidade de roteador Wi-Fi.
   * **Monitor e Logger Python:** Utilitário assíncrono em `robo_monitor/` para gravação e análise automatizada de corridas.
 * **Fusão Sensorial e Orientação Absoluta (IMU Bosch BMI160):**
   * Correção giroscópica contínua em retas (`IMU_KP_YAW_RETA = 2.0`) reduzindo o desvio angular para menos de 1°.
@@ -50,13 +50,13 @@ Teste_car_0/
 │   ├── pid_controller.h       # PID com feedforward por velocidade e Anti-Windup
 │   ├── telemetry_recorder.h   # Gravador de telemetria em RAM (dump serial/WebSocket)
 │   └── firmware_robo2wd_v4.ino# FSM não-bloqueante, partida remota e telemetria 5Hz
-├── gateway_espnow/            # [GATEWAY] Firmware para ESP32-S3 Super Mini (Ponte ESP-NOW <-> USB)
+├── gateway_espnow/            # [GATEWAY] Firmware do gateway ESP32 (Ponte ESP-NOW <-> USB)
 │   └── gateway_espnow.ino
 ├── robo_monitor/              # [FERRAMENTAS PC] Scripts de recepção e análise de dados
 │   ├── robo_ws_logger.py      # Logger WebSocket assíncrono para terminal e CSV (+ --replay)
 │   ├── capturar_dump.py       # Captura o dump do gravador em RAM via serial
 │   ├── capturar_dump_wifi.py  # Captura o dump do gravador em RAM via WebSocket
-│   ├── gateway_espnow.py      # Ponte serial do gateway ESP32-S3 (ESP-NOW <-> PC)
+│   ├── gateway_espnow.py      # Ponte serial do gateway ESP32 (ESP-NOW <-> PC)
 │   ├── requirements.txt       # Dependências Python (websockets, rich, pyserial)
 │   └── logs/                  # Diretório de armazenamento de corridas em CSV
 ├── legacy/                    # [LEGADO] Versões históricas preservadas
@@ -71,7 +71,7 @@ Teste_car_0/
 └── docs/                      # Documentação técnica e de engenharia
     ├── FSD.md                 # Especificação Funcional Definitiva (v4.0.0 em PT-BR)
     ├── MANUAL_TECNICO.md      # Manual completo de pinagem, cinemática, operação e compilação
-    ├── ROTEIRO_ESPNOW.md      # Validação da ponte robô <-> gateway ESP32-S3
+    ├── ROTEIRO_ESPNOW.md      # Validação da ponte robô <-> gateway ESP32
     └── DIARIO_ENGENHARIA.md   # Registro cronológico detalhado da evolução do projeto
 ```
 
@@ -131,7 +131,7 @@ Teste_car_0/
 - `robo_monitor/capturar_dump.py` — captura via serial.
 - `robo_monitor/robo_ws_logger.py --replay dump.txt --saida out.csv` — converte o dump em CSV.
 - `diag_motor_curve/` com Wi-Fi: varredura não-bloqueante, buffer em RAM e página web (`sweep`/`csv`/`clear`).
-- **ESP-NOW no robô (`espnow_link.h`)**: telemetria JSON a 5 Hz ao gateway ESP32-S3 e recepção dos comandos `start`/`stop`/`pause`/`reset`/`dump`. Compatível com ESP-IDF v4/v5. `robo_monitor/gateway_espnow.py` é a ponte serial do gateway.
+- **ESP-NOW no robô (`espnow_link.h`)**: telemetria JSON a 5 Hz ao gateway ESP32 e recepção dos comandos `start`/`stop`/`pause`/`reset`/`dump`. Compatível com ESP-IDF v4/v5. `robo_monitor/gateway_espnow.py` é a ponte serial do gateway.
 
 ## 📄 Atualizações Recentes (13/11/2026)
 
