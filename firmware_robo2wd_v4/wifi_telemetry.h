@@ -72,6 +72,8 @@ struct TelemetryPacket {
     uint32_t    pwm1;        // PWM motor 1 em microsegundos
     uint32_t    pwm2;        // PWM motor 2 em microsegundos
     float       rpmAlvo;     // RPM alvo do perfil trapezoidal
+    float       vbat;        // tensao da bateria (V); -1 = desabilitado
+    uint8_t     vbatNivel;   // 0 ok, 1 atencao, 2 critico
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -441,6 +443,10 @@ function atualizarDiag(d){
   const okDiv = Math.abs(div) < 30.0;
   const okBias = Math.abs(bias) < 0.5;
   const cor = (okDiv && okBias) ? '#3fb950' : (okDiv ? '#d29922' : '#f85149');
+  // Bateria: -1 = monitor desabilitado (sem divisor).
+  const vbat = (d.vbat !== undefined) ? d.vbat : -1;
+  const nivel = (d.vbatNivel !== undefined) ? d.vbatNivel : 0;
+  const corVbat = (vbat < 0) ? '#8b949e' : (nivel >= 2 ? '#f85149' : (nivel === 1 ? '#d29922' : '#3fb950'));
   el.innerHTML =
     'rumo corte <b style="color:#58a6ff">' + ((d.yawAbs||0).toFixed(1)) + '°</b> · ' +
     'inércia <b style="color:#f38021">' + (ine>=0?'+':'') + ine.toFixed(1) + '°</b> · ' +
@@ -450,7 +456,10 @@ function atualizarDiag(d){
     (okDiv ? '' : ' ⚠') +
     ' &nbsp;|&nbsp; bias giro <b style="color:' + (okBias?'#3fb950':'#f85149') + '">' +
     (isNaN(bias)?'—':(bias>=0?'+':'') + bias.toFixed(2)) + ' °/s</b>' +
-    (okBias ? '' : ' ⚠ boot contaminado?');
+    (okBias ? '' : ' ⚠ boot contaminado?') +
+    ' &nbsp;|&nbsp; bateria <b style="color:' + corVbat + '">' +
+    (vbat < 0 ? '—' : vbat.toFixed(2) + ' V') + '</b>' +
+    (nivel >= 2 ? ' ⚠ CRÍTICO' : (nivel === 1 ? ' ⚠' : ''));
 }
 
 // Download CSV
@@ -574,6 +583,8 @@ public:
         doc["w1"]  = pkt.pwm1;
         doc["w2"]  = pkt.pwm2;
         doc["rt"]  = roundf(pkt.rpmAlvo * 10.0f) / 10.0f;
+        doc["vbat"] = roundf(pkt.vbat * 100.0f) / 100.0f;
+        doc["vbatNivel"] = pkt.vbatNivel;
 
         String json;
         serializeJson(doc, json);
@@ -605,6 +616,11 @@ public:
         return _lastCmd;
     }
 
+    // Parametro do ultimo comando (ex.: "vbat 8.22" -> "8.22")
+    const char* getLastParam() const {
+        return _lastParam;
+    }
+
     // -------------------------------------------------------------------------
     // isConnected() — WiFi conectado?
     // -------------------------------------------------------------------------
@@ -632,6 +648,8 @@ private:
 
     volatile bool _newCommand = false;  // flag para novo comando recebido
     char          _lastCmd    = '\0';   // último comando
+    // Parametro do comando (ex.: "vbat 8.22" -> _lastParam = "8.22")
+    char          _lastParam[24] = {0};
     uint8_t       _clientCount = 0;     // número de clientes WS ativos
 
     // -------------------------------------------------------------------------
@@ -661,26 +679,40 @@ private:
                 Serial.print(F("[WS] Comando recebido: "));
                 Serial.println(msg);
 
-                if (msg == "start" || msg == "s") {
+                // Separa o parametro (ex.: "vbat 8.22" -> cmd "vbat", param "8.22")
+                String cmd = msg, param;
+                int esp = msg.indexOf(' ');
+                if (esp > 0) {
+                    cmd   = msg.substring(0, esp);
+                    param = msg.substring(esp + 1);
+                    param.trim();
+                }
+
+                if (cmd == "start" || cmd == "s") {
                     _newCommand = true;
                     _lastCmd    = 's';
-                } else if (msg == "stop") {
+                } else if (cmd == "stop") {
                     _lastCmd = 'x';
-                } else if (msg == "pause" || msg == "p") {
+                } else if (cmd == "pause" || cmd == "p") {
                     _newCommand = true;
                     _lastCmd    = 'p';
-                } else if (msg == "reset" || msg == "r") {
+                } else if (cmd == "reset" || cmd == "r") {
                     _newCommand = true;
                     _lastCmd    = 'r';
-                } else if (msg == "dump" || msg == "d") {
+                } else if (cmd == "dump" || cmd == "d") {
                     _newCommand = true;   // dispara o tratamento no loop principal
                     _lastCmd    = 'd';    // dump do gravador de telemetria (RAM)
-                } else if (msg == "reta" || msg == "t") {
+                } else if (cmd == "reta" || cmd == "t") {
                     _newCommand = true;   // reta unica de 500 mm (diagnostico)
                     _lastCmd    = 't';
-                } else if (msg == "pivo" || msg == "g") {
+                } else if (cmd == "pivo" || cmd == "g") {
                     _newCommand = true;   // pivo unico de 90 graus (diagnostico)
                     _lastCmd    = 'g';
+                } else if (cmd == "vbat" || cmd == "v") {
+                    _newCommand = true;   // calibragem: "vbat <tensao_real>"
+                    _lastCmd    = 'v';
+                    strncpy(_lastParam, param.c_str(), sizeof(_lastParam) - 1);
+                    _lastParam[sizeof(_lastParam) - 1] = '\0';
                 }
                 break;
             }

@@ -9,6 +9,7 @@
 #include "wifi_telemetry.h"
 #include "telemetry_recorder.h"
 #include "espnow_link.h"
+#include "battery_monitor.h"
 #include "secrets.h"
 
 // =========================================================================
@@ -40,6 +41,12 @@ uint32_t g_lastEspnowRx = 0;   // ultimo recebimento do gateway (watchdog de enl
 
 // Gravador de telemetria em RAM (para testes sem cabo serial, ex.: robô no solo)
 TelemetryRecorder recorder;
+
+// Monitor de bateria LiPo 2S (divisor R1=100k/R2=47k no GPIO 34)
+BatteryMonitor battery;
+float g_vbat = -1.0f;          // tensao da bateria (V); -1 = desabilitado/sem leitura
+uint8_t g_vbatNivel = 0;       // 0 ok, 1 atencao, 2 critico
+uint32_t g_vbatUltimoAviso = 0;
 
 // Dump incremental via WebSocket / ESP-NOW (robô sem cabo)
 static bool     _dumpParaWs = false;
@@ -437,8 +444,46 @@ void enviarTelemetria(uint32_t now) {
     pkt.pwm1       = g_lastPwm1;
     pkt.pwm2       = g_lastPwm2;
     pkt.rpmAlvo    = g_emLinhaReta ? VELOCIDADE_CRUZEIRO_RPM : VELOCIDADE_GIRO_RPM;
+    pkt.vbat       = g_vbat;
+    pkt.vbatNivel  = g_vbatNivel;
 
     wirelessTelem.sendTelemetry(pkt);
+}
+
+// =========================================================================
+// MONITOR DE BATERIA (LiPo 2S)
+// =========================================================================
+// Le a tensao, publica na telemetria e, se critica, corta os motores.
+// A leitura e' feita aqui (e nao dentro de enviarTelemetria) para que o
+// intervalo seja fixo (VBAT_LEITURA_MS), independente da taxa de telemetria.
+void monitorarBateria(uint32_t now) {
+    if (!battery.isEnabled()) { g_vbat = -1.0f; g_vbatNivel = 0; return; }
+
+    g_vbat = battery.readVolts();
+    if (g_vbat < 0.0f) return;
+    g_vbatNivel = battery.nivel();
+
+    // Aviso periodico no Serial (nao inunda: 1x/2 s)
+    if (g_vbatNivel >= 1 && now - g_vbatUltimoAviso >= 2000) {
+        g_vbatUltimoAviso = now;
+        Serial.print(F("[BATERIA] "));
+        Serial.print(g_vbat, 2);
+        Serial.print(F(" V (adc "));
+        Serial.print(battery.lastAdc(), 0);
+        Serial.print(F(") — "));
+        Serial.println(g_vbatNivel == 2 ? F("CRITICO! Cortando motores.")
+                                       : F("atencao (limiar 7,0 V)."));
+    }
+
+    // Corte de seguranca: abaixo do limiar, para os motores e encerra a
+    // trajetoria. A LiPo 2S abaixo de 3,30 V/celula e' danificada.
+    if (g_vbatNivel == 2 && estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA) {
+        motors.stopAll();
+        g_lastPwm1 = ESC_NEUTRO_US;
+        g_lastPwm2 = ESC_NEUTRO_US;
+        estadoAtual = ESTADO_EMERGENCIA;
+        Serial.println(F("\n[BATERIA] Tensao critica! Trajetoria interrompida."));
+    }
 }
 
 // =========================================================================
@@ -474,13 +519,14 @@ void enviarTelemEspNow(uint32_t now) {
         "\"yawOdom\":%.2f,\"diverg\":%.2f,\"gyroBias\":%.3f,"
         "\"yawReal\":%.2f,\"inercia\":%.2f,\"inerciaOdom\":%.2f,"
         "\"r1\":%.1f,\"r2\":%.1f,\"t1\":%ld,\"t2\":%ld,\"tg\":%ld,"
-        "\"w1\":%u,\"w2\":%u,\"rt\":%.1f}",
+        "\"w1\":%u,\"w2\":%u,\"rt\":%.1f,\"vbat\":%.2f,\"vbatNivel\":%u}",
         (unsigned long)now, estadoStr, g_ladoAtual, QUADRADO_LADOS, yaw, g_yawAbs,
         g_yawOdom, g_yawAbs - g_yawOdom, g_gyroBiasDps,
         g_yawAbs + g_inerciaTotal, g_inerciaImu, g_inerciaOdom,
         rpm1, rpm2, (long)t1, (long)t2, (long)g_targetTicks,
         (unsigned)g_lastPwm1, (unsigned)g_lastPwm2,
-        g_emLinhaReta ? VELOCIDADE_CRUZEIRO_RPM : VELOCIDADE_GIRO_RPM);
+        g_emLinhaReta ? VELOCIDADE_CRUZEIRO_RPM : VELOCIDADE_GIRO_RPM,
+        g_vbat, (unsigned)g_vbatNivel);
 
     if (n > 0 && n < (int)sizeof(buf)) espnow.sendTelemetry(buf);
 }
@@ -638,6 +684,33 @@ void setup() {
                   REC_MAX_SAMPLES, 1000 / REC_INTERVAL_MS, (float)REC_MAX_SAMPLES * REC_INTERVAL_MS / 1000.0f);
     Serial.println(F("[REC] Envie 'd' (serial) ou 'dump' (WebSocket) para despejar o buffer em CSV."));
 
+    // 8. Monitor de bateria (divisor R1=100k/R2=47k no GPIO 34)
+    battery.begin();
+    if (battery.isEnabled()) {
+        g_vbat = battery.readVolts();
+        Serial.print(F("[BATERIA] Monitor ativo no GPIO "));
+        Serial.print(PIN_BATTERY_ADC);
+        Serial.print(F(" | Tensao: "));
+        if (g_vbat >= 0.0f) {
+            Serial.print(g_vbat, 2);
+            Serial.print(F(" V (adc "));
+            Serial.print(battery.lastAdc(), 0);
+            Serial.print(F(", limiar atencao "));
+            Serial.print(VBAT_LIMIAR_ATENCAO, 1);
+            Serial.print(F(" V / corte "));
+            Serial.print(VBAT_LIMIAR_CORTE, 1);
+            Serial.println(F(" V)"));
+            if (!battery.isCalibrated()) {
+                Serial.println(F("[BATERIA] SEM CALIBRACAO: usando a curva nominal do ADC."));
+                Serial.println(F("[BATERIA] Mecca a bateria no multimetro e aplique a calibracao de 2 pontos."));
+            }
+        } else {
+            Serial.println(F("sem leitura (divisor nao montado?)."));
+        }
+    } else {
+        Serial.println(F("[BATERIA] Monitor desabilitado (PIN_BATTERY_ADC = -1)."));
+    }
+
     // 7. Enlace ESP-NOW: o init e o registro do peer são feitos DEPOIS da
     //    conexão Wi-Fi, porque o peer precisa nascer com o canal atual da
     //    interface (registrá-lo antes usa um canal que o connect sobrescreve).
@@ -686,11 +759,12 @@ void loop() {
         esp_task_wdt_reset();
     }
 
-    // Envio periódico de telemetria sem fio (5 Hz)
+    // Envio periódico de telemetria sem fio (adaptativo: 20 Hz em movimento)
     if (estadoAtual != ESTADO_FALHA_HARDWARE) {
         enviarTelemetria(now);
         enviarTelemEspNow(now);
         gravarAmostraRecorder(now);
+        monitorarBateria(now);
     }
 
     // Comando de dump do gravador via Serial ('d') ou WebSocket ("dump")
@@ -742,6 +816,8 @@ void loop() {
     // hasNewCommand()/hasCommand(), o primeiro zera a flag e o segundo nunca vê
     // o comando. Dispatch central (um switch no topo do loop()).
     String cmdTxt;
+    // Parametro do comando (ex.: "vbat 8.22" -> _paramComando = "8.22")
+    static char _paramComando[32] = {0};
     bool _comandoVeioPorEspNow = false;
     if (g_wifiOk && wirelessTelem.hasNewCommand()) {
         char c = wirelessTelem.getLastCommand();
@@ -756,6 +832,7 @@ void loop() {
             case 'd': cmdTxt = "dump";  break;
             case 't': cmdTxt = "reta";  break;   // 't' de "teste de uma reta"
             case 'g': cmdTxt = "pivo";  break;   // 'g' de "giro" (pivo unico)
+            case 'v': cmdTxt = "vbat"; strncpy(_paramComando, wirelessTelem.getLastParam(), sizeof(_paramComando) - 1); break;
             default: break;
         }
     }
@@ -824,6 +901,25 @@ void loop() {
                 g_emLinhaReta = false;   // comeca ja no giro
                 subEstado = SUB_INICIAR_SEGMENTO;
                 estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
+            }
+        } else if (cmdTxt == "vbat") {
+            // Calibragem de bateria: "vbat <tensao_real>". A tensao real e' a
+            // medida no multimetro nos terminais da bateria. Aplica uma reta de
+            // dois pontos: o ponto medido + o vazio (adc 0 -> 0 V).
+            float alvo = atof(_paramComando);
+            if (alvo > 0.0f && battery.isEnabled()) {
+                float adc = battery.lastAdc();
+                battery.setCalibracao(adc, alvo, 0.0f, 0.0f);
+                g_vbat = battery.readVolts();
+                Serial.print(F("[BATERIA] Calibrada: adc "));
+                Serial.print(adc, 0);
+                Serial.print(F(" -> "));
+                Serial.print(alvo, 2);
+                Serial.print(F(" V | leitura atual: "));
+                Serial.print(g_vbat, 2);
+                Serial.println(F(" V"));
+            } else {
+                Serial.println(F("[BATERIA] Calibragem invalida (use 'vbat <tensao>')."));
             }
         } else if (cmdTxt == "dump") {
             _dumpIdx = 0;

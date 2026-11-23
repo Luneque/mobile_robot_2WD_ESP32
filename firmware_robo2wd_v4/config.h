@@ -23,7 +23,27 @@
 #define PIN_ENC2_B         32   // Canal B
 
 // Monitoramento de Bateria (Opcional - ADC1)
-#define PIN_BATTERY_ADC    -1   // -1 se desabilitado, ou GPIO (ex: 34, 35) se houver divisor
+// O divisor R1=100k/R2=47k (GPIO 34 = ADC1_CH6) foi montado em 19/11/2026.
+// ATENCAO: o GPIO34 e' apenas entrada (sem pull-up interno). O divisor entrega
+// no maximo ~2,5 V, dentro do fundo de escala de 3,3 V do ADC.
+#define PIN_BATTERY_ADC    34   // -1 se desabilitado, ou GPIO (ex: 34, 35) se houver divisor
+#define VBAT_HABILITADO    (PIN_BATTERY_ADC >= 0)
+// Divisor de tensao: Vbat = Vadc * (R1 + R2) / R2
+#define VBAT_R1_OHMS       100000.0f
+#define VBAT_R2_OHMS        47000.0f
+#define VBAT_DIVIDER       ((VBAT_R1_OHMS + VBAT_R2_OHMS) / VBAT_R2_OHMS)  // ~3,128
+// Calibracao nominal do fundo de escala: com atenuacao de 11 dB o ADC do ESP32
+// satura bem antes de 2,5 V. Medido em 19/11/2026: divisor R1=100k/R2=47k com
+// bateria de 8,22 V le adc = 3060. O segundo ponto (vazio) e' estimado pelo
+// ganho real do divisor, ~0,2626 V por unidade de ADC.
+// Para recalibrar: meca a bateria no multimetro e envie "vbat <tensao_real>".
+#define VBAT_ADC_REF_VOLTS  0.2626f   // V por unidade de ADC (ganho real do divisor)
+#define VBAT_ADC_REF_ZERO   0.0f      // ADC em 0 V (offset)
+#define VBAT_ADC_ATTEN     11      // atenuacao do ADC (11 dB)
+#define VBAT_AMOSTRAS      16      // media para suavizar o ruido do ADC
+#define VBAT_LIMIAR_ATENCAO 7.0f   // V: avisa no painel/telemetria
+#define VBAT_LIMIAR_CORTE   6.6f   // V: 3,30 V/celula -> corta os motores
+#define VBAT_LEITURA_MS     500     // intervalo de leitura da tensao
 
 // ==========================================
 // 2. PARÂMETROS MECÂNICOS E CINEMÁTICOS (CALIBRADOS)
