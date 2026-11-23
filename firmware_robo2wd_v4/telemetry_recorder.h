@@ -8,16 +8,17 @@
  *
  * Uso:
  *   TelemetryRecorder rec;
- *   rec.begin();                       // no setup()
- *   rec.sample(pkt, estadoStr);        // no loop, a cada REC_INTERVAL_MS
- *   rec.dump();                        // despeja o buffer via Serial
+ *   rec.begin();                          // no setup()
+ *   rec.sample(now, estado, lado, ...);   // no loop, a cada REC_INTERVAL_MS
+ *   rec.dump();                           // despeja o buffer via Serial, em lotes
  *
  * Comandos que disparam o dump:
  *   - Serial: caractere 'd'
  *   - WebSocket: "dump"
  *
- * Formato do dump (uma linha por amostra):
- *   REC,<ts>,<estado>,<lado>,<yaw>,<rpm1>,<rpm2>,<ticks1>,<ticks2>,<ticksAlvo>,<pwm1>,<pwm2>,<rpmAlvo>
+ * Formato do dump (uma linha por amostra, 16 campos):
+ *   REC,<ts>,<estado>,<lado>,<yaw>,<yawAbs>,<yawOdom>,<diverg>,<gyroBias>,
+ *   <rpm1>,<rpm2>,<ticks1>,<ticks2>,<ticksAlvo>,<pwm1>,<pwm2>,<rpmAlvo>
  */
 
 #ifndef TELEMETRY_RECORDER_H
@@ -42,6 +43,20 @@
 #define REC_MAX_SAMPLES     1700
 #endif
 
+// Tamanho do buffer de UMA linha de dump. A linha tem 16 colunas: medido com
+// os especificadores reais da serializacao, ~98 bytes no caso tipico e ate
+// ~141 no pior caso. O limite anterior (96 no .ino) truncava a ultima coluna
+// (rpmAlvo) sem nenhum aviso.
+#ifndef DUMP_LINE_MAX
+#define DUMP_LINE_MAX        160
+#endif
+// Quantas linhas do dump por Serial entre uma cessao e outra. Despejar 1700
+// linhas (~150 KB a 115200 baud, ~13 s) de uma vez seguraria o loop() por mais
+// tempo que o Task Watchdog de 5 s, que reiniciaria o robo no meio do dump.
+#ifndef REC_DUMP_YIELD_A_CADA
+#define REC_DUMP_YIELD_A_CADA 10
+#endif
+
 // Cabeçalho CSV do dump (compatível com o logger WebSocket)
 static const char REC_CSV_HEADER[] =
     "timestamp_ms,estado,lado,yaw_deg,yaw_abs_deg,yaw_odom_deg,diverg_deg,gyro_bias_dps,"
@@ -55,7 +70,7 @@ struct RecSample {
     uint8_t  estado;    // código de estado (ver REC_EST_*)
     uint8_t  lado;      // segmento atual (1–4)
     int16_t  yaw;       // graus * 100 (precisão de 0,01°, relativo ao segmento)
-    int16_t  yawAbs;    // graus * 10 (rumo global integrado, horário = positivo)
+    int16_t  yawAbs;    // graus * 10 (rumo global integrado, anti-horario = positivo)
     int16_t  yawOdom;   // graus * 10 (rumo global por odometria dos encoders)
     int16_t  diverg;    // graus * 10 (yawAbs - yawOdom)
     int16_t  gyroBias;  // graus/s * 100 (bias residual medido no boot)
@@ -160,7 +175,13 @@ public:
         _lastSample = now;
     }
 
-    // Despeja o buffer via Serial em CSV, uma amostra por linha.
+    // Funcao de cessao chamada entre lotes do dump por Serial. O chamador
+    // registra com setYieldFn() algo que alimente o Task Watchdog e ceda o
+    // processador — sem isso um dump completo reiniciaria o robo.
+    typedef void (*YieldFn)();
+    void setYieldFn(YieldFn fn) { _yieldFn = fn; }
+
+    // Despeja o buffer via Serial em CSV, uma amostra por linha, em lotes.
     uint16_t dump() {
         uint16_t n = _count;
         Serial.println(F("\n[REC] Iniciando dump do gravador de telemetria..."));
@@ -191,16 +212,17 @@ public:
             Serial.print(s.pwm1);      Serial.print(',');
             Serial.print(s.pwm2);      Serial.print(',');
             Serial.println(s.rpmAlvo / 10.0f, 1);
+            if (_yieldFn && ((i + 1) % REC_DUMP_YIELD_A_CADA == 0)) _yieldFn();
         }
         Serial.println(F("[REC] Dump concluido."));
         return n;
     }
 
-    // Serializa uma amostra em CSV dentro do buffer fornecido (para envio via WS).
-    // Retorna o número de caracteres escritos.
+    // Serializa uma amostra em CSV dentro do buffer fornecido (para envio via WS/ESP-NOW).
+    // Retorna o tamanho da linha. Se o valor for >= outLen, a linha foi TRUNCADA:
+    // assim o chamador distingue um dump valido de um cortado.
     size_t dumpSample(uint16_t pos, char* out, size_t outLen) {
         if (outLen < 2) return 0;
-        uint16_t n = _count;
         uint16_t idx;
         if (_overflow) {
             idx = (uint16_t)((_head + pos) % REC_MAX_SAMPLES);
@@ -208,16 +230,20 @@ public:
             idx = pos;
         }
         const RecSample& s = _buf[idx];
+        // ATENCAO: 16 conversoes para 16 argumentos, nesta ordem — ts, estado,
+        // lado, yaw, yawAbs, yawOdom, diverg, gyroBias, rpm1, rpm2, ticks1,
+        // ticks2, ticksAlvo, pwm1, pwm2, rpmAlvo. Ja' houve aqui um %.2f a
+        // mais (17 conversoes x 16 args): comportamento indefinido no snprintf
+        // e a linha remota saia com um campo espuria.
         int k = snprintf(out, outLen,
-            "REC,%lu,%s,%u,%.2f,%.2f,%.2f,%.2f,%.2f,%.3f,%.1f,%.1f,%ld,%ld,%ld,%u,%u,%.1f",
+            "REC,%lu,%s,%u,%.2f,%.2f,%.2f,%.2f,%.3f,%.1f,%.1f,%ld,%ld,%ld,%u,%u,%.1f",
             (unsigned long)s.ts, recEstadoTxt(s.estado), (unsigned)s.lado,
             s.yaw / 100.0f, s.yawAbs / 10.0f, s.yawOdom / 10.0f, s.diverg / 10.0f,
             s.gyroBias / 100.0f, s.rpm1 / 10.0f, s.rpm2 / 10.0f,
             (long)s.ticks1, (long)s.ticks2, (long)s.ticksAlvo,
             (unsigned)s.pwm1, (unsigned)s.pwm2, s.rpmAlvo / 10.0f);
         if (k < 0) return 0;
-        if ((size_t)k >= outLen) return outLen - 1;
-        return (size_t)k;
+        return (size_t)k;   // k >= outLen => linha truncada
     }
 
     uint16_t count() const { return _count; }
@@ -231,6 +257,7 @@ private:
     bool      _overflow = false;
     uint32_t  _lastSample = 0;
     bool      _recording = true;
+    YieldFn   _yieldFn = nullptr;
 };
 
 #endif // TELEMETRY_RECORDER_H

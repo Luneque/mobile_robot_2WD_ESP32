@@ -55,7 +55,7 @@ struct TelemetryPacket {
     int         lado;        // segmento atual (1–4)
     int         totalLados;  // sempre 4
     float       yaw;         // graus (com sinal, relativo ao início do segmento)
-    float       yawAbs;      // graus (absoluto desde o boot; usado no mapa 2D)
+    float       yawAbs;      // graus (rumo global; zerado no start, usado no mapa 2D)
     float       yawOdom;     // graus (rumo por odometria dos encoders, ticks com sinal)
     float       diverg;      // graus (yawAbs - yawOdom): divergencia IMU x odometria
     float       gyroBias;    // graus/s (bias residual do giroscopio, medido no boot)
@@ -115,6 +115,7 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
        font-weight:600;transition:opacity .2s}
   .btn:hover{opacity:.85}
   #btnStart{background:#238636;color:#fff}
+  #btnStop{background:#da3633;color:#fff}
   #btnCsv{background:#1f6feb;color:#fff}
   /* ---- Grid de gráficos ---- */
   #charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:14px}
@@ -140,6 +141,7 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
   <span id="badge" class="AGUARDO">AGUARDO</span>
   <span id="segTxt">Lado — de 4</span>
   <button class="btn" id="btnStart" onclick="sendCmd('start')">▶ START</button>
+  <button class="btn" id="btnStop"  onclick="sendCmd('stop')" title="Interrompe a trajetória imediatamente">⏹ STOP</button>
   <button class="btn" id="btnReta"  onclick="sendCmd('t')" title="Uma reta de 500 mm, para no fim (diagnóstico de escala)">📏 Reta 500</button>
   <button class="btn" id="btnPivo"  onclick="sendCmd('g')" title="Um pivô de 90° no lugar, para no fim (diagnóstico de ângulo)">🔄 Pivô 90</button>
   <button class="btn" id="btnCsv"   onclick="downloadCsv()">⬇ Download CSV</button>
@@ -178,7 +180,7 @@ let posX = 500, posY = 0; // Ponto de partida real: Início (500, 0)
 let prevTicks = 0, prevSegSide = -1, prevSegState = '';
 let trajectory = [{x: 500, y: 0}];
 let curHeadingDeg = 0;      // Rumo GLOBAL real (0 = +Y, 90 = +X), integrado do yaw
-let rumoReal = 0;          // Rumo global REAL (graus, horário = positivo), ja com a inercia
+let rumoReal = 0;          // Rumo global REAL (graus, anti-horario = positivo), ja com a inercia
 let lastSt = '', lastSide = -1;
 
 function resetMap() {
@@ -692,7 +694,11 @@ private:
                     _newCommand = true;
                     _lastCmd    = 's';
                 } else if (cmd == "stop") {
-                    _lastCmd = 'x';
+                    // Tem de setar a flag: o dispatch central so' consome comando
+                    // quando hasNewCommand() e' true (antes este ramo gravava o
+                    // caractere e o comando morria aqui).
+                    _newCommand = true;
+                    _lastCmd    = 'x';
                 } else if (cmd == "pause" || cmd == "p") {
                     _newCommand = true;
                     _lastCmd    = 'p';

@@ -22,7 +22,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 
 - **Working tree:** limpo.
 - **Branch:** `main` sincronizado com `origin/main` até `3ca004f`.
-- **Testes:** 16 + 17 nativos, 15 Python, CI verde.
+- **Testes:** 16 + 17 + 1 testes nativos (`test_recorder.cpp`) e 18 Python, CI verde.
 
 ---
 

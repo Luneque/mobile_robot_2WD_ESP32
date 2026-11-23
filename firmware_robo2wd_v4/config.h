@@ -98,6 +98,10 @@
 // Clampe da correção de sincronismo cruzado (µs) aplicada ao PWM de cada motor.
 // Valor original era literal no loop; virou macro para ficar visível/configurável.
 #define SYNC_CLAMP_US      50.0f
+// Clampe proprio do pivo: la o sincronismo usa apenas os encoders (a IMU ja atua
+// no criterio de parada e no perfil trapezoidal), e o valor calibrado em solo e'
+// menor que o da reta. Mantido separado para nao alterar o comportamento validado.
+#define SYNC_CLAMP_PIVO_US 35.0f
 #define CONTROL_LOOP_MS    20       // Período de amostragem do loop de controle (20ms = 50Hz)
 
 // ==========================================
@@ -181,7 +185,8 @@
 // MAC do gateway (preencher apos gravar gateway_espnow.ino e ler o MAC
 // impresso no Serial). Broadcast = envia para qualquer gateway no canal.
 #define ESPNOW_GATEWAY_MAC      {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
-// Timeout sem receber do gateway: apos este periodo o robo reporta falha de enlace.
-#define ESPNOW_LINK_TIMEOUT_MS  3000
+// (Removido em 23/11/2026: ESPNOW_LINK_TIMEOUT_MS existia sem nenhum consumidor,
+// enquanto o comentario prometia um watchdog de enlace que nunca foi
+// implementado. O enlace e' tratado por falha de envio em EspNowLink::onSent.)
 
 #endif // CONFIG_H

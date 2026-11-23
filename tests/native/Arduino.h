@@ -17,6 +17,18 @@
 #define PROGMEM
 #define F(x) x
 
+// Serial simulado: os headers do firmware usam Serial.print/println, e o
+// teste do gravador exercita dumpSample()/dump(). Basta engolir a saida.
+struct StubSerial {
+    void begin(unsigned long) {}
+    template <typename T> void print(const T&) {}
+    template <typename T> void print(const T&, int) {}
+    template <typename T> void println(const T&) {}
+    template <typename T> void println(const T&, int) {}
+    void println() {}
+};
+static StubSerial Serial;
+
 // Arduino define abs() como macro (serve para int e float).
 #ifndef abs
 #define abs(x) ((x) > 0 ? (x) : -(x))

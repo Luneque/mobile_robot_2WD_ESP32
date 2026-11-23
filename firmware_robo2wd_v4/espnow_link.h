@@ -92,8 +92,11 @@ public:
     bool sendTelemetry(const char* json) {
         if (!_initOk || !json) return false;
         size_t n = strlen(json);
-        if (n > ESPNOW_MAX_PAYLOAD) n = ESPNOW_MAX_PAYLOAD;
-        esp_err_t r = esp_now_send(_gatewayMac, (const uint8_t*)json, (uint8_t)(n + 1));
+        if (n > ESPNOW_MAX_PAYLOAD - 1) n = ESPNOW_MAX_PAYLOAD - 1;
+        // Envia exatamente n bytes. O limite do ESP-NOW e' ESP_NOW_MAX_DATA_LEN
+        // (250); enviar n+1 estourava quando o JSON tinha 250 bytes, e o
+        // terminador extra era descartado na ponta (o gateway imprime com %s).
+        esp_err_t r = esp_now_send(_gatewayMac, (const uint8_t*)json, (uint8_t)n);
         if (r == ESP_OK) _lastSendOk = true;
         return r == ESP_OK;
     }

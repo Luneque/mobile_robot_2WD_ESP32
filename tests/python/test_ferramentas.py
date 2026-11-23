@@ -184,6 +184,115 @@ class TestDashboardJS(unittest.TestCase):
         self.assertIn("yawParaRumo(rumoReal)", corpo,
                       "mapa nao esta integrando o rumo real")
 
+    def test_stop_via_ws_seta_a_flag(self):
+        # O ramo "stop" gravava _lastCmd sem setar _newCommand, e o dispatch
+        # central so' consome comando quando hasNewCommand() e' true: a parada
+        # remota pelo WebSocket morria ali (revisao de engenharia, item 2.1).
+        src = (FIRMWARE / "wifi_telemetry.h").read_text(encoding="utf-8")
+        m = re.search(r'\} else if \(cmd == "stop"\) \{(.*?)\}', src, re.S)
+        if m is None:
+            self.fail("nao achei o ramo stop do handler de texto")
+        self.assertIn("_newCommand = true", m.group(1),
+                      "ramo stop precisa setar _newCommand para o dispatch ve-lo")
+
+    def test_dashboard_tem_botao_de_stop(self):
+        html = (FIRMWARE / "wifi_telemetry.h").read_text(encoding="utf-8")
+        self.assertIn('sendCmd(\'stop\')', html, "dashboard sem botao de STOP")
+
+
+class TestFormatStrings(unittest.TestCase):
+    """Toda snprintf/printf do firmware com conversoes tem de ter o numero
+    certo de argumentos.
+
+    Motivo: o dump do gravador tinha 17 conversoes para 16 argumentos —
+    comportamento indefinido no snprintf e uma coluna espúria no CSV remoto.
+    A toolchain do ESP32 não reclamou; este teste reclama.
+    """
+
+    CONV = re.compile(
+        r"%(?:%|[-+ #0]*(?:\*|\d+)?(?:\.\*|\.\d+)?"
+        r"(?:hh|h|ll|l|z|j|t)?[diouxXeEfFgGaAcspn])")
+    LIT = re.compile(r'"((?:[^"\\]|\\.)*)"')
+
+    def _chamadas(self, src):
+        for m in re.finditer(r"\b(?:snprintf|printf)\s*\(", src):
+            i = m.end() - 1
+            depth = 0
+            while i < len(src):
+                c = src[i]
+                if c == "(":
+                    depth += 1
+                elif c == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                i += 1
+            yield src[m.end():i]
+
+    @staticmethod
+    def _divide_args(s):
+        partes, depth, cur, aspas = [], 0, "", None
+        i, pilha = 0, []
+        while i < len(s):
+            c = s[i]
+            if aspas:
+                cur += c
+                if c == aspas and s[i - 1] != "\\":
+                    aspas = None
+            elif c in "\"'":
+                aspas, cur = c, cur + c
+            elif c == "(":
+                # F("...") e' transparente (macro do Arduino)
+                t = (i > 0 and s[i - 1] == "F" and i + 1 < len(s) and s[i + 1] == '"')
+                pilha.append(t)
+                if not t:
+                    depth += 1
+                cur += c
+            elif c == ")":
+                t = pilha.pop() if pilha else False
+                if not t:
+                    depth -= 1
+                cur += c
+            elif c == "," and depth == 0:
+                partes.append(cur.strip())
+                cur = ""
+            else:
+                cur += c
+            i += 1
+        if cur.strip():
+            partes.append(cur.strip())
+        return partes
+
+    @staticmethod
+    def _e_literal(a):
+        a = a.strip()
+        if a.startswith("F(") and a.endswith(")"):
+            a = a[2:-1].strip()
+        return a.startswith('"')
+
+    def test_conversoes_batem_com_argumentos(self):
+        problemas = []
+        for arq in sorted(list(FIRMWARE.glob("*.h")) + list(FIRMWARE.glob("*.ino"))):
+            src = arq.read_text(encoding="utf-8", errors="replace")
+            for corpo in self._chamadas(src):
+                args = self._divide_args(corpo)
+                if len(args) >= 3 and self._e_literal(args[2]):   # snprintf(buf,n,fmt,...)
+                    fmt, nvar = "".join(self.LIT.findall(args[2])), len(args) - 3
+                elif len(args) >= 1 and self._e_literal(args[0]):  # printf(fmt,...)
+                    fmt, nvar = "".join(self.LIT.findall(args[0])), len(args) - 1
+                else:
+                    continue
+                convs = [m.group(0) for m in self.CONV.finditer(fmt)]
+                nvar += sum(c.count("*") for c in convs)   # %* consome arg extra
+                if not convs and nvar == 0:
+                    continue
+                if len(convs) != nvar:
+                    problemas.append("%s: %d conversoes x %d args (%s...)" %
+                                     (arq.name, len(convs), nvar, fmt[:40]))
+        self.assertEqual(problemas, [],
+                         "conversoes em desacordo com os argumentos:\n" +
+                         "\n".join(problemas))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

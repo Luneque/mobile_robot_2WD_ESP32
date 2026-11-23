@@ -69,7 +69,7 @@ public:
         if (!_initialized) return;
         float sum = 0.0f;
         for (uint16_t i = 0; i < samples; i++) {
-            // Leitura direta do eixo Z para que giro a DIREITA (Horario) gere valor POSITIVO (+)
+            // Eixo Z para cima: giro ANTI-HORARIO gera valor POSITIVO (+).
             float gz = readRawGyroZ();
             sum += gz;
             delay(5);

@@ -42,7 +42,7 @@ manutenibilidade.
 
 ## 2. Bugs Reais e Confirmados
 
-### 2.1 [ALTA] STOP via WebSocket é silenciosamente descartado
+### 2.1 [RESOLVIDO em 23/11/2026] STOP via WebSocket é silenciosamente descartado
 
 - **Local:** `firmware_robo2wd_v4/wifi_telemetry.h:667-668`
 - **Causa:** o ramo `msg == "stop"` grava `_lastCmd = 'x'` mas **não** seta
@@ -55,7 +55,7 @@ manutenibilidade.
 - **Correção:** adicionar `_newCommand = true;` no ramo `"stop"` (1 linha) e,
   opcionalmente, um botão de parada no dashboard.
 
-### 2.2 [ALTA] Dump remoto (WebSocket/ESP-NOW) trunca a última coluna
+### 2.2 [RESOLVIDO em 23/11/2026] Dump remoto (WebSocket/ESP-NOW) trunca a última coluna
 
 - **Local:** `firmware_robo2wd_v4.ino:51` (`static char _dumpLinha[96];`)
 - **Causa:** a linha do gravador tem 16 colunas e precisa de mais que 96 bytes.
@@ -72,7 +72,7 @@ manutenibilidade.
 - **Correção:** ampliar para 160 bytes e checar o retorno do `snprintf` (o
   `return outLen - 1` atual mascara o truncamento).
 
-### 2.3 [ALTA] Dump por serial pode reiniciar o robô no meio
+### 2.3 [RESOLVIDO em 23/11/2026] Dump por serial pode reiniciar o robô no meio
 
 - **Local:** `firmware_robo2wd_v4/telemetry_recorder.h:164-197` +
   `firmware_robo2wd_v4.ino:701`
@@ -86,7 +86,7 @@ manutenibilidade.
 - **Correção:** dividir em lotes com `esp_task_wdt_reset()` entre eles (o
   padrão já existe no dump WS/ESP-NOW).
 
-### 2.4 [ALTA] Bloco de reancoragem duplicado 6× e já divergente
+### 2.4 [RESOLVIDO em 23/11/2026] Bloco de reancoragem duplicado 6× e já divergente
 
 - **Local:** `firmware_robo2wd_v4.ino:781-791`, `:799-808`, `:816-826`,
   `:849-859`, `:897-907`, `:915-925`
@@ -98,7 +98,7 @@ manutenibilidade.
   anterior e o mapa sai errado, sem aviso.
 - **Correção:** extrair `reancorarTrajetoria()` e chamar nos seis pontos.
 
-### 2.5 [MÉDIA] ESP-NOW envia 251 bytes quando o payload tem 250
+### 2.5 [RESOLVIDO em 23/11/2026] ESP-NOW envia 251 bytes quando o payload tem 250
 
 - **Local:** `firmware_robo2wd_v4/espnow_link.h:95-96`
 - **Causa:** `n` é limitado a `ESPNOW_MAX_PAYLOAD` (250) e depois envia
@@ -106,7 +106,7 @@ manutenibilidade.
 - **Efeito:** `esp_now_send` retorna erro nesse caso.
 - **Correção:** enviar `n` bytes (ou limitar `n` a 249).
 
-### 2.6 [MÉDIA] `SYNC_CLAMP_US` ignorado no pivô
+### 2.6 [RESOLVIDO em 23/11/2026] `SYNC_CLAMP_US` ignorado no pivô
 
 - **Local:** `firmware_robo2wd_v4.ino:325-326` (reta) vs `:355-356` (pivô)
 - **Causa:** a reta usa a macro `SYNC_CLAMP_US` (50 µs); o pivô usa o literal
@@ -114,7 +114,7 @@ manutenibilidade.
 - **Correção:** usar `SYNC_CLAMP_US` nos dois modos (ou criar
   `SYNC_CLAMP_PIVO_US` e documentar a diferença).
 
-### 2.7 [MÉDIA] Watchdog de enlace ESP-NOW prometido e não implementado
+### 2.7 [RESOLVIDO em 23/11/2026] Watchdog de enlace ESP-NOW prometido e não implementado
 
 - **Local:** `firmware_robo2wd_v4.ino:39` (`g_lastEspnowRx`) +
   `config.h:163` (`ESPNOW_LINK_TIMEOUT_MS`)
@@ -123,7 +123,7 @@ manutenibilidade.
 - **Correção:** implementar o timeout (usar `g_lastEspnowRx`) ou remover a
   macro e a variável.
 
-### 2.8 [MÉDIA] `rpmAlvo` não é o perfil trapezoidal
+### 2.8 [RESOLVIDO em 23/11/2026] `rpmAlvo` não é o perfil trapezoidal
 
 - **Local:** `firmware_robo2wd_v4.ino:439` e `:518-520`
 - **Causa:** a telemetria promete "RPM alvo do perfil trapezoidal"
@@ -132,7 +132,7 @@ manutenibilidade.
   `calcularRPMTrapezoidal*`.
 - **Correção:** enviar o valor trapezoidal real.
 
-### 2.9 [MÉDIA] Comentários de convenção de giro estão errados
+### 2.9 [RESOLVIDO em 23/11/2026] Comentários de convenção de giro estão errados
 
 - **Local:** `firmware_robo2wd_v4.ino:92` ("+1 = Direita (Horário)"),
   `:213` e `imu_bmi160.h:72` ("giro a DIREITA (Horário) gera valor POSITIVO")
@@ -144,7 +144,42 @@ manutenibilidade.
   errar o sentido.
 - **Correção:** alinhar os três comentários à convenção real.
 
+### 2.10 Resolução dos itens 2.1–2.9 (23/11/2026)
+
+Todos os nove itens foram corrigidos e verificados. Onde havia causa dupla, a
+causa real era pior do que o título do item:
+
+- **2.2:** a causa dominante **não** era só o buffer de 96 bytes — o `snprintf`
+  do `dumpSample()` tinha **17 conversões para 16 argumentos** (um `%.2f` a
+  mais), ou seja, comportamento indefinido e uma coluna espúria no CSV remoto.
+  Corrigido para 16 × 16; `_dumpLinha` passou de 96 para `DUMP_LINE_MAX` (160).
+- **2.3:** `recorder.dump()` agora despeja em lotes e chama uma função de
+  cessão (`setYieldFn`) que alimenta o Task Watchdog — antes eram ~13 s
+  bloqueando o `loop()`, acima do WDT de 5 s.
+- **2.4:** criada `reancorarTrajetoria()`, único ponto de reancoragem. O restart
+  por **serial** no `ESTADO_CONCLUIDO`, que não reancorava nada, passou a usá-la.
+- **2.6:** o pivô ganhou `SYNC_CLAMP_PIVO_US` (35 µs), valor calibrado em solo,
+  em vez de herdar o clamp de 50 µs da reta — mantendo o comportamento validado.
+- **2.7:** `ESPNOW_LINK_TIMEOUT_MS` e `g_lastEspnowRx` eram código morto que
+  prometia um watchdog; foram removidos.
+
+**Validação com o robô no solo:**
+
+| Verificação | Resultado |
+| :--- | :--- |
+| Dump via WebSocket (328 linhas) | todas com 17 campos, última coluna íntegra |
+| `rt` na reta (antes: fixo em 55) | **20,0 → 55,0 RPM** na aceleração e **55 → 23,6** na desaceleração |
+| `rt` no pivô / parado | 25,0 RPM / 0,0 RPM |
+| Botão STOP do painel | badge `RETA → CONCLUIDO`, PWM em 1500 µs |
+
+**Novos testes:** `tests/native/test_recorder.cpp` (formato do dump, cabeçalho de
+16 campos, truncamento, última coluna) e `TestFormatStrings` no
+`test_ferramentas.py` (audita **todas** as chamadas `snprintf`/`printf` do
+firmware contra o número de argumentos — 15 chamadas, 0 divergências). Foi esse
+teste que revelou o `snprintf` 17×16.
+
 ---
+
 
 ## 3. Divergências entre Código e Documentação
 
@@ -304,8 +339,14 @@ Três suspeitas levantadas durante a inspeção foram verificadas e **não** se
 confirmam — registradas aqui para não serem "redescobertas":
 
 1. **`snprintf` do `dumpSample()` com 17 especificadores e 16 argumentos**
-   (`telemetry_recorder.h:211-217`): **falso**. Contados 16 especificadores e
-   16 argumentos. O problema real é o buffer de 96 bytes (item 2.2).
+   (`telemetry_recorder.h`): **verdadeiro — e foi corrigido**. A suspeita levantada
+   na inspeção era correta e foi confirmada pelo compilador do teste nativo
+   (`-Wformat-insufficient-args`). Havia um `%.2f` a mais na linha do dump:
+   comportamento indefinido no `snprintf` e uma coluna espúria no CSV remoto.
+   Corrigido para 16 conversões × 16 argumentos; agora coberto por
+   `test_conversoes_batem_com_argumentos` e por `tests/native/test_recorder.cpp`.
+   (Registro honesto: esta alegação havia sido descartada numa verificação
+   anterior por contagem manual equivocada.)
 2. **`abs()` em float** (`imu_bmi160.h:89`, `pid_controller.h:57`, `.ino:285`):
    **falso**. No core 3.3.12 resolve para `std::abs(float)`, sem truncamento.
    O stub de `tests/native/Arduino.h` está correto.
@@ -374,15 +415,15 @@ correções, atualizar a coluna **Estado** abaixo e referenciar o commit.
 
 | Item | Descrição | Severidade | Estado |
 | :--- | :--- | :---: | :--- |
-| 2.1 | STOP via WebSocket descartado | ALTA | pendente |
-| 2.2 | `_dumpLinha[96]` trunca o dump remoto | ALTA | pendente |
-| 2.3 | Dump serial estoura o WDT de 5 s | ALTA | pendente |
-| 2.4 | Reancoragem duplicada 6× e divergente | ALTA | pendente |
-| 2.5 | ESP-NOW envia 251 bytes | MÉDIA | pendente |
-| 2.6 | `SYNC_CLAMP_US` ignorado no pivô | MÉDIA | pendente |
-| 2.7 | Watchdog de enlace ESP-NOW não implementado | MÉDIA | pendente |
-| 2.8 | `rpmAlvo` não é o trapezoidal | MÉDIA | pendente |
-| 2.9 | Comentários de convenção de giro errados | MÉDIA | pendente |
+| 2.1 | STOP via WebSocket descartado | ALTA | **resolvido** |
+| 2.2 | `_dumpLinha[96]` trunca o dump remoto | ALTA | **resolvido** (e causa real era o `snprintf` 17×16) |
+| 2.3 | Dump serial estoura o WDT de 5 s | ALTA | **resolvido** |
+| 2.4 | Reancoragem duplicada 6× e divergente | ALTA | **resolvido** |
+| 2.5 | ESP-NOW envia 251 bytes | MÉDIA | **resolvido** |
+| 2.6 | `SYNC_CLAMP_US` ignorado no pivô | MÉDIA | **resolvido** (`SYNC_CLAMP_PIVO_US`) |
+| 2.7 | Watchdog de enlace ESP-NOW não implementado | MÉDIA | **resolvido** (macro/variável mortos removidos) |
+| 2.8 | `rpmAlvo` não é o trapezoidal | MÉDIA | **resolvido** |
+| 2.9 | Comentários de convenção de giro errados | MÉDIA | **resolvido** |
 | 3.1 | Comandos seriais do Manual não funcionam | MÉDIA | pendente |
 | 3.2 | "Parada remota pelo painel" não existe | MÉDIA | pendente |
 | 3.3 | Instrução de `ESPNOW_CHANNEL` aponta macro removida | MÉDIA | pendente |

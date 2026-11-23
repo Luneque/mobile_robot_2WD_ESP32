@@ -37,7 +37,6 @@ uint32_t g_lastTelemTime = 0;
 EspNowLink espnow;
 bool g_espnowOk = false;
 uint32_t g_lastEspnowTelem = 0;
-uint32_t g_lastEspnowRx = 0;   // ultimo recebimento do gateway (watchdog de enlace)
 
 // Gravador de telemetria em RAM (para testes sem cabo serial, ex.: robô no solo)
 TelemetryRecorder recorder;
@@ -47,6 +46,9 @@ BatteryMonitor battery;
 float g_vbat = -1.0f;          // tensao da bateria (V); -1 = desabilitado/sem leitura
 uint8_t g_vbatNivel = 0;       // 0 ok, 1 atencao, 2 critico
 uint32_t g_vbatUltimoAviso = 0;
+// RPM alvo INSTANTANEO do perfil trapezoidal (publicado na telemetria). Ate
+// 23/11/2026 a telemetria enviava sempre o valor fixo de cruzeiro/giro.
+float g_rpmAlvo = 0.0f;
 
 // Dump incremental via WebSocket / ESP-NOW (robô sem cabo)
 static bool     _dumpParaWs = false;
@@ -55,12 +57,28 @@ static bool     _dumpCanalEspNow = false;
 static uint16_t _dumpIdx = 0;
 static uint16_t _dumpTotal = 0;
 static uint32_t _dumpUltimoEnvio = 0;
-static char     _dumpLinha[96];
+static char     _dumpLinha[DUMP_LINE_MAX];
+static bool     _dumpTruncadoAvisado = false;
 #define DUMP_WS_INTERVAL_MS 50
 #define DUMP_WS_POR_LOTE    10
 // ESP-NOW: lote menor e intervalo maior (rajadas descartam pacotes no gateway)
 #define DUMP_ESPNOW_INTERVAL_MS 100
 #define DUMP_ESPNOW_POR_LOTE    1
+
+// Detecta linha de dump truncada: dumpSample() devolve um valor >= do tamanho
+// do buffer quando o snprintf nao coube. Avisa uma unica vez por dump.
+static void avisarTruncamentoDump(size_t len) {
+    if (len >= sizeof(_dumpLinha) && !_dumpTruncadoAvisado) {
+        _dumpTruncadoAvisado = true;
+        Serial.println(F("[REC] AVISO: linha de dump truncada (buffer menor que a linha)."));
+    }
+}
+
+// Cessao usada pelo despejo do gravador: alimenta o Task Watchdog e cede o
+// processador. Sem isso um dump completo (~13 s) reiniciaria o robo.
+static void cederEAlimentarWdt() {
+    esp_task_wdt_reset();
+}
 
 uint32_t g_lastPwm1 = ESC_NEUTRO_US;
 uint32_t g_lastPwm2 = ESC_NEUTRO_US;
@@ -96,9 +114,11 @@ uint32_t g_pausaStartTime = 0;
 int32_t g_targetTicks = 0;
 float g_distanciaTotalMm = 0.0f;
 float g_anguloTotalGraus = 0.0f;
-int g_sentidoGiro = 1; // +1 = Direita (Horário)
+// Sentido do giro. Convencao de sinal do BMI160 (eixo Z para cima): yaw
+// POSITIVO = rotacao ANTI-HORARIA. O mapa do dashboard renderiza -yaw.
+int g_sentidoGiro = 1; // +1 = anti-horario (yaw positivo)
 float g_yawStartSeg = 0.0f; // Ângulo de yaw exato no instante em que o movimento inicia
-float g_yawAbs = 0.0f;      // Rumo GLOBAL (graus, horário) acumulado entre segmentos
+float g_yawAbs = 0.0f;      // Rumo GLOBAL (graus, anti-horario = positivo) acumulado entre segmentos
 float g_yawPrevAmostra = 0.0f; // Yaw relativo da amostra anterior (para integrar o delta)
 // Rumo global por ODOMETRIA (ticks com sinal): fonte independente da IMU, usada para
 // detectar divergencia entre o giroscopio e os encoders.
@@ -217,7 +237,33 @@ void iniciarMovimentoCurva(float anguloGraus, int sentido) {
     g_desbalStartTime = 0;
     subEstado = SUB_EM_MOVIMENTO;
     Serial.printf("\n[V4-PIVO] Curva %d de %d | Angulo: %.1f deg (%s) | Alvo: %d ticks/roda\n",
-                  g_ladoAtual, QUADRADO_LADOS, anguloGraus, (sentido > 0) ? "DIREITA" : "ESQUERDA", g_targetTicks);
+                  g_ladoAtual, QUADRADO_LADOS, anguloGraus,
+                  (sentido > 0) ? "ANTI-HORARIO" : "HORARIO", g_targetTicks);
+}
+
+// =========================================================================
+// REANCORAGEM DE TRAJETORIA
+// =========================================================================
+// Unico ponto que zera os referenciais de rumo/odometria/inercia, a
+// instrumentacao de diagnostico e arma a FSM. Antes eram 6 blocos copiados,
+// e o reinicio por Serial do ESTADO_CONCLUIDO não reancorava nada (o segundo
+// quadrado consecutivo herdava o rumo do anterior).
+//
+// Ancora o referencial de rumo: a deriva do giroscopio acumulada enquanto o
+// robo fica parado (tipicamente 2-3 graus) apareceria como erro lateral.
+void reancorarTrajetoria() {
+    recorder.clear();
+    g_yawAbs = 0.0f;
+    g_yawOdom = 0.0f;
+    g_inerciaTotal = 0.0f;
+    g_odomSoma = 0;
+    g_odomCiclos = 0;
+    g_ladoAtual = 1;
+    g_modoRetaUnica = false;
+    g_modoPivoUnico = false;
+    g_emLinhaReta = true;
+    subEstado = SUB_INICIAR_SEGMENTO;
+    estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
 }
 
 // Integra o rumo (IMU + odometria de ticks com sinal).
@@ -258,6 +304,10 @@ void processarControleMovimento(uint32_t now) {
     float dt = (now - g_lastLoopTime) / 1000.0f;
     encoders.updateSpeed(dt);
     integrarRumo(now, dt, false);
+
+    // RPM alvo instantaneo começa zerado: se o ramo de emergencia fizer return
+    // antes do perfil trapezoidal, a telemetria nao publica um valor velho.
+    g_rpmAlvo = 0.0f;
 
     float rpm1 = encoders.getRPM1();
     float rpm2 = encoders.getRPM2();
@@ -359,8 +409,8 @@ void processarControleMovimento(uint32_t now) {
         float sync_error_pivot = (float)(t1 - t2);
         float sync_corr = sync_error_pivot * K_SYNC;
 
-        if (sync_corr > 35.0f) sync_corr = 35.0f;
-        if (sync_corr < -35.0f) sync_corr = -35.0f;
+        if (sync_corr > SYNC_CLAMP_PIVO_US) sync_corr = SYNC_CLAMP_PIVO_US;
+        if (sync_corr < -SYNC_CLAMP_PIVO_US) sync_corr = -SYNC_CLAMP_PIVO_US;
 
         if (g_sentidoGiro > 0) {
             out1 -= sync_corr;
@@ -375,6 +425,10 @@ void processarControleMovimento(uint32_t now) {
         g_lastPwm1 = (uint32_t)out1;
         g_lastPwm2 = (uint32_t)out2;
     }
+
+    // O RPM alvo que a telemetria deve reportar e' o do perfil trapezoidal
+    // (rampa 20->55 RPM na reta, 20->25 no pivo), nao o fixo de cruzeiro/giro.
+    g_rpmAlvo = (fabsf(targetRpmM1) + fabsf(targetRpmM2)) / 2.0f;
 }
 
 // =========================================================================
@@ -427,7 +481,7 @@ void enviarTelemetria(uint32_t now) {
     pkt.lado       = g_ladoAtual;
     pkt.totalLados = QUADRADO_LADOS;
     pkt.yaw        = yaw;
-    pkt.yawAbs     = g_yawAbs;   // rumo global integrado (horário = positivo)
+    pkt.yawAbs     = g_yawAbs;   // rumo global integrado (anti-horario = positivo)
     pkt.yawOdom    = g_yawOdom;  // rumo global por odometria (fonte independente)
     pkt.diverg     = g_yawAbs - g_yawOdom;
     pkt.gyroBias   = g_gyroBiasDps;
@@ -443,7 +497,9 @@ void enviarTelemetria(uint32_t now) {
     pkt.ticksAlvo  = g_targetTicks;
     pkt.pwm1       = g_lastPwm1;
     pkt.pwm2       = g_lastPwm2;
-    pkt.rpmAlvo    = g_emLinhaReta ? VELOCIDADE_CRUZEIRO_RPM : VELOCIDADE_GIRO_RPM;
+    // Fora de execucao o alvo e' zero (senao a telemetria publica o ultimo
+    // valor do perfil, ex.: 55 RPM com o robo parado).
+    pkt.rpmAlvo    = (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA) ? g_rpmAlvo : 0.0f;
     pkt.vbat       = g_vbat;
     pkt.vbatNivel  = g_vbatNivel;
 
@@ -525,7 +581,7 @@ void enviarTelemEspNow(uint32_t now) {
         g_yawAbs + g_inerciaTotal, g_inerciaImu, g_inerciaOdom,
         rpm1, rpm2, (long)t1, (long)t2, (long)g_targetTicks,
         (unsigned)g_lastPwm1, (unsigned)g_lastPwm2,
-        g_emLinhaReta ? VELOCIDADE_CRUZEIRO_RPM : VELOCIDADE_GIRO_RPM,
+        emMovimento ? g_rpmAlvo : 0.0f,
         g_vbat, (unsigned)g_vbatNivel);
 
     if (n > 0 && n < (int)sizeof(buf)) espnow.sendTelemetry(buf);
@@ -561,9 +617,7 @@ void gravarAmostraRecorder(uint32_t now) {
     int32_t t1  = abs(encoders.getTicksM1());
     int32_t t2  = abs(encoders.getTicksM2());
     float yaw   = imu.isInitialized() ? imu.getYawAngleDeg() : 0.0f;
-    float rpmAlvo = (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA)
-                        ? (g_emLinhaReta ? VELOCIDADE_CRUZEIRO_RPM : VELOCIDADE_GIRO_RPM)
-                        : 0.0f;
+    float rpmAlvo = (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA) ? g_rpmAlvo : 0.0f;
 
     recorder.sample(now, codigoEstadoRecorder(), (uint8_t)g_ladoAtual,
                    yaw, g_yawAbs, g_yawOdom, g_yawAbs - g_yawOdom, g_gyroBiasDps,
@@ -680,6 +734,9 @@ void setup() {
 
     // 6. Inicialização do gravador de telemetria em RAM (replay de teste)
     recorder.begin();
+    // O despejo por Serial e' feito em lotes; entre um lote e outro o gravador
+    // chama esta cessao para alimentar o Task Watchdog.
+    recorder.setYieldFn(cederEAlimentarWdt);
     Serial.printf("[REC] Gravador de telemetria ativo: %d amostras a %d Hz (max %.0f s).\n",
                   REC_MAX_SAMPLES, 1000 / REC_INTERVAL_MS, (float)REC_MAX_SAMPLES * REC_INTERVAL_MS / 1000.0f);
     Serial.println(F("[REC] Envie 'd' (serial) ou 'dump' (WebSocket) para despejar o buffer em CSV."));
@@ -724,7 +781,6 @@ void setup() {
     } else {
         Serial.println(F("[AVISO] ESP-NOW indisponivel. Operando apenas com Wi-Fi."));
     }
-    g_lastEspnowRx = millis();
 }
 
 // =========================================================================
@@ -775,6 +831,7 @@ void loop() {
         char c = Serial.read();
         if (c == 'd' || c == 'D') {
             _dumpParaWs = false;
+            _dumpTruncadoAvisado = false;
             recorder.dump();
         }
     }
@@ -785,7 +842,8 @@ void loop() {
             _dumpUltimoEnvio = now;
             uint16_t fim = (uint16_t)min((uint16_t)(_dumpIdx + DUMP_WS_POR_LOTE), _dumpTotal);
             for (uint16_t i = _dumpIdx; i < fim; i++) {
-                recorder.dumpSample(i, _dumpLinha, sizeof(_dumpLinha));
+                avisarTruncamentoDump(
+                    recorder.dumpSample(i, _dumpLinha, sizeof(_dumpLinha)));
                 wirelessTelem.sendRaw(_dumpLinha);
             }
             _dumpIdx = fim;
@@ -804,7 +862,8 @@ void loop() {
                 _dumpUltimoEnvio = now;
                 uint16_t fim = (uint16_t)min((uint16_t)(_dumpIdx + DUMP_ESPNOW_POR_LOTE), _dumpTotal);
                 for (uint16_t i = _dumpIdx; i < fim; i++) {
-                    recorder.dumpSample(i, _dumpLinha, sizeof(_dumpLinha));
+                    avisarTruncamentoDump(
+                        recorder.dumpSample(i, _dumpLinha, sizeof(_dumpLinha)));
                     espnow.sendTelemetry(_dumpLinha);
                 }
                 _dumpIdx = fim;
@@ -841,7 +900,6 @@ void loop() {
     }
     if (g_espnowOk && espnow.hasCommand()) {
         const char* e = espnow.getLastCommand();
-        g_lastEspnowRx = now;   // enlace vivo
         Serial.print(F("[LOOP] comando ESP-NOW: "));
         Serial.println(e);
         if (cmdTxt.isEmpty()) {
@@ -854,56 +912,24 @@ void loop() {
         if (cmdTxt == "start") {
             if (estadoAtual == ESTADO_AGUARDO_INICIO || estadoAtual == ESTADO_CONCLUIDO) {
                 Serial.println("\n>>> COMANDO RECEBIDO! INICIANDO TRAJETÓRIA DO QUADRADO <<<");
-                recorder.clear();
-                // Ancora o referencial de rumo no início do trajeto: sem isso, a
-                // deriva do giroscópio acumulada enquanto o robô ficou parado
-                // (tipicamente 2–3°) apareceria como erro lateral no mapa.
-                g_yawAbs = 0.0f;
-                g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
-                g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
-                g_odomSoma = 0;   // zera a instrumentacao de diagnostico
-                g_odomCiclos = 0;
-                g_ladoAtual = 1;
-                g_modoRetaUnica = false;   // o quadrado completo reinicia o modo
-                g_modoPivoUnico = false;
-                subEstado = SUB_INICIAR_SEGMENTO;
-                g_emLinhaReta = true;
-                estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
+                reancorarTrajetoria();
             }
         } else if (cmdTxt == "reta") {
             // Diagnostico: uma unica reta, para no fim. Serve para medir no chao
             // o comprimento real do lado e assim separar "IMU errada" de "PPR errado".
             if (estadoAtual == ESTADO_AGUARDO_INICIO || estadoAtual == ESTADO_CONCLUIDO) {
                 Serial.println("\n>>> MODO RETA UNICA: 500 mm (diagnostico) <<<");
-                recorder.clear();
-                g_yawAbs = 0.0f;
-                g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
-                g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
-                g_odomSoma = 0;   // zera a instrumentacao de diagnostico
-                g_odomCiclos = 0;
-                g_ladoAtual = 1;
-                g_modoRetaUnica = true;
-                g_emLinhaReta = true;
-                subEstado = SUB_INICIAR_SEGMENTO;
-                estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
+                reancorarTrajetoria();
+                g_modoRetaUnica = true;   // reancorarTrajetoria() zera os modos
             }
         } else if (cmdTxt == "pivo") {
             // Diagnostico: um unico pivo no lugar, para no fim. Serve para medir
             // no chao o angulo real e assim separar "IMU errada" de "bitola errada".
             if (estadoAtual == ESTADO_AGUARDO_INICIO || estadoAtual == ESTADO_CONCLUIDO) {
                 Serial.println("\n>>> MODO PIVO UNICO: 90 graus no lugar (diagnostico) <<<");
-                recorder.clear();
-                g_yawAbs = 0.0f;
-                g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
-                g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
-                g_odomSoma = 0;   // zera a instrumentacao de diagnostico
-                g_odomCiclos = 0;
-                g_ladoAtual = 1;
-                g_modoRetaUnica = false;
-                g_modoPivoUnico = true;
-                g_emLinhaReta = false;   // comeca ja no giro
-                subEstado = SUB_INICIAR_SEGMENTO;
-                estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
+                reancorarTrajetoria();
+                g_modoPivoUnico = true;   // reancorarTrajetoria() zera os modos
+                g_emLinhaReta = false;    // comeca ja no giro
             }
         } else if (cmdTxt == "vbat") {
             // Calibragem de bateria: "vbat <tensao_real>". A tensao real e' a
@@ -928,6 +954,7 @@ void loop() {
         } else if (cmdTxt == "dump") {
             _dumpIdx = 0;
             _dumpTotal = recorder.count();
+            _dumpTruncadoAvisado = false;
             _dumpCanalEspNow = _comandoVeioPorEspNow;
             if (_dumpCanalEspNow) {
                 _dumpParaEspNow = true;
@@ -945,18 +972,7 @@ void loop() {
                 Serial.println("\n[PARADA REMOTA] Trajetoria interrompida!");
             }
         } else if (cmdTxt == "reset") {
-            recorder.clear();
-            g_yawAbs = 0.0f;
-            g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
-            g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
-            g_odomSoma = 0;   // zera a instrumentacao de diagnostico
-            g_odomCiclos = 0;
-            g_ladoAtual = 1;
-            g_modoRetaUnica = false;   // o quadrado completo reinicia o modo
-            g_modoPivoUnico = false;
-            g_emLinhaReta = true;
-            subEstado = SUB_INICIAR_SEGMENTO;
-            estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
+                reancorarTrajetoria();
         }
     }
 
@@ -993,36 +1009,14 @@ void loop() {
                 }
                 if (comandoRecebido) {
                     Serial.println("\n>>> COMANDO RECEBIDO! INICIANDO TRAJETÓRIA DO QUADRADO <<<");
-                    recorder.clear(); // Descarta amostras do teste anterior
-                    g_yawAbs = 0.0f;
-                    g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
-                    g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
-                    g_odomSoma = 0;   // zera a instrumentacao de diagnostico
-                    g_odomCiclos = 0;
-                    g_ladoAtual = 1;
-                    g_modoRetaUnica = false;   // o quadrado completo reinicia o modo
-                    g_modoPivoUnico = false;
-                    subEstado = SUB_INICIAR_SEGMENTO;
-                    g_emLinhaReta = true;
-                    estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
+                    reancorarTrajetoria();
                 }
             }
             // Timeout automático de 5 segundos (apenas sem Wi-Fi: com Wi-Fi o
             // início é remoto e o buffer do gravador deve ser preservado)
             if (!g_wifiOk && now - g_pausaStartTime >= 5000) {
                 Serial.println("\n>>> TIMEOUT DE 5s ATINGIDO! INICIANDO TRAJETÓRIA DO QUADRADO <<<");
-                recorder.clear();
-                g_yawAbs = 0.0f;
-                g_yawOdom = 0.0f;   // reancora tambem o rumo por odometria
-                g_inerciaTotal = 0.0f;   // o rumo real tambem reancora
-                g_odomSoma = 0;   // zera a instrumentacao de diagnostico
-                g_odomCiclos = 0;
-                g_ladoAtual = 1;
-                g_modoRetaUnica = false;   // o quadrado completo reinicia o modo
-                g_modoPivoUnico = false;
-                subEstado = SUB_INICIAR_SEGMENTO;
-                g_emLinhaReta = true;
-                estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
+                reancorarTrajetoria();
             }
             break;
 
@@ -1113,11 +1107,7 @@ void loop() {
                 }
                 if (comandoRecebido) {
                     Serial.println("\n>>> COMANDO RECEBIDO! REINICIANDO TRAJETÓRIA DO QUADRADO <<<");
-                    recorder.clear(); // Descarta amostras do teste anterior
-                    g_ladoAtual = 1;
-                    g_emLinhaReta = true;
-                    subEstado = SUB_INICIAR_SEGMENTO;
-                    estadoAtual = ESTADO_EXECUTANDO_TRAJETORIA;
+                    reancorarTrajetoria();
                 }
             }
             delay(10);

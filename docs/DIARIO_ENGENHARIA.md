@@ -461,6 +461,23 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 * **`tests/`:** Testes automatizados sem hardware — `tests/native/` (16 + 17 testes sobre `robo_matematica.h` e o critério de corte do pivô) e `tests/python/` (15 testes de ferramentas, cabeçalhos e do JS do dashboard). Rodados no CI.
 * **`ferramentas/`:** Geradores de assets (ex.: `gerar_chartjs_asset.py`, que publica o Chart.js gzip em PROGMEM).
 
+## 📄 Atualizações Recentes (23/11/2026)
+
+### Firmware — resolução dos bugs da Revisão nº 1 (seção 1)
+- **Dump remoto corrigido na raiz:** o `snprintf` tinha **17 conversões para 16 argumentos** (UB, coluna espúria); agora 16 × 16, com `_dumpLinha` de 96 → 160 bytes e aviso de truncamento.
+- **Dump por serial sem reset:** despejo em lotes com cessão que alimenta o Task Watchdog (antes ~13 s bloqueados, acima do WDT de 5 s).
+- **STOP via WebSocket funcional:** o ramo `"stop"` passou a setar `_newCommand`; ganhou botão **⏹ STOP** no dashboard. Validado em solo (`RETA → CONCLUIDO`).
+- **`reancorarTrajetoria()`:** um único ponto de reancoragem; o restart por serial do `CONCLUIDO`, que não reancorava nada, agora reancora.
+- **`rpmAlvo` trapezoidal real:** a telemetria reporta a rampa (medido: 20 → 55 RPM na reta, 55 → 23,6 na desaceleração), não mais o valor fixo.
+- **Pivô:** novo `SYNC_CLAMP_PIVO_US` (35 µs), mantendo o comportamento validado.
+- **Código morto removido:** `ESPNOW_LINK_TIMEOUT_MS` e `g_lastEspnowRx` (prometiam um watchdog inexistente); comentários de convenção de giro alinhados à real (yaw positivo = anti-horário).
+- **ESP-NOW:** envio ajustado para exatamente `n` bytes (antes `n+1` estourava o limite de 250).
+
+### Testes
+- `tests/native/test_recorder.cpp` — formato do dump, cabeçalho de 16 campos, truncamento e última coluna.
+- `TestFormatStrings` — audita todas as chamadas `snprintf`/`printf` do firmware contra o número de argumentos (15 chamadas, 0 divergências). Foi este teste que revelou o bug do `snprintf`.
+- `test_stop_via_ws_seta_a_flag` e `test_dashboard_tem_botao_de_stop`.
+
 ## 📄 Atualizações Recentes (19/11/2026)
 
 - **`yawReal` (rumo real):** `g_yawAbs + g_inerciaTotal` — cortes + inércia de **todos** os pivôs (Etapa 25).

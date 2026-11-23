@@ -23,7 +23,7 @@ import tempfile
 RAIZ = pathlib.Path(__file__).resolve().parents[2]
 NATIVO = pathlib.Path(__file__).resolve().parent
 FW = RAIZ / "firmware_robo2wd_v4"
-TESTES = ["test_cinematica.cpp", "test_pivo.cpp"]
+TESTES = ["test_cinematica.cpp", "test_pivo.cpp", "test_recorder.cpp"]
 
 
 def encontrar_compilador():
