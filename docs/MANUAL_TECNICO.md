@@ -176,6 +176,32 @@ O robô grava telemetria em RAM a 20 Hz (1700 amostras, 85 s) — ideal para tes
 & "C:\Users\luneque.junior\AppData\Local\Arduino15\packages\esp32\tools\esptool_py\5.3.1\esptool.exe" --chip esp32 --port COM9 --baud 921600 --before default-reset --after hard-reset write_flash -z --flash-mode dio --flash-freq 80m --flash-size 4MB 0x1000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.bootloader.bin" 0x8000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.partitions.bin" 0xe000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\boot_app0.bin" 0x10000 "C:\Users\luneque.junior\Projetos_IA\Teste_car_0\firmware_robo2wd_v4\build\esp32.esp32.esp32\firmware_robo2wd_v4.ino.bin"
 ```
 
+## 2.1 Particionamento da flash (4 MB)
+
+Esquema sob medida em `firmware_robo2wd_v4/partitions.csv` (o Arduino copia o
+CSV do sketch na frente do `default.csv`). Gravado no chip em 23/11/2026.
+
+| Partição | Tipo | Offset | Tamanho | Uso |
+| :--- | :--- | :--- | :--- | :--- |
+| nvs | data/nvs | 0x009000 | 20 KB | Wi-Fi, calibração da IMU, namespace `bateria` |
+| otadata | data/ota | 0x00E000 | 8 KB | estado do OTA |
+| app0 | app/ota_0 | 0x010000 | **1,25 MB** | firmware atual |
+| app1 | app/ota_1 | 0x150000 | **1,25 MB** | slot de OTA / reversão |
+| spiffs | data/spiffs | 0x290000 | **1,25 MB** | dados gerais |
+| coredump | data/coredump | 0x3D0000 | 64 KB | captura de panic |
+| *(livre)* | — | 0x3E0000 | 128 KB | reserva |
+
+- **Antes (esquema Arduino "default"):** SPIFFS de 1,38 MB terminando em
+  0x3F0000 e coredump por último. O firmware não usa SPIFFS/LittleFS.
+- **Depois:** SPIFFS 1,25 MB e coredump antecipado para 0x3D0000, sobrando
+  128 KB de reserva. Os slots de app foram mantidos em 1,25 MB cada para
+  preservar a possibilidade de OTA/reversão.
+- **Folga:** o firmware usa ~1,15 MB por slot, sobram ~100 KB em cada um.
+- **Atenção:** trocar de esquema apaga a NVS; como o offset da NVS é o mesmo
+  (0x9000), a calibração da bateria e as credenciais Wi-Fi **sobreviveram**.
+
+---
+
 ## 📄 Atualizações Recentes (19/11/2026)
 
 ### Firmware
