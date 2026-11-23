@@ -166,3 +166,44 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 - **Compilação:** 1.130.039 bytes (86%) flash, 120.864 bytes (36%) RAM.
 - **Funcional:** replay do dump testado (452 amostras → CSV com cabeçalho correto).
 - **Solo (19/11/2026):** quadrado com fechamento de 7,8–8,7 mm; pivôs 88,2–90,7°; mapa fechando em ~7 mm.
+
+---
+
+## 6. Revisão de Engenharia (19/11/2026)
+
+Auditoria completa de código × documentação registrada em
+[`docs/REVISAO_ENGENHARIA.md`](docs/REVISAO_ENGENHARIA.md), com plano de
+melhorias em três prioridades e tabela de acompanhamento.
+
+**4 defeitos de alta severidade** (todos em telemetria/comandos; nenhum afeta a
+dinâmica do robô):
+
+1. **STOP via WebSocket é descartado** — `wifi_telemetry.h:667` grava o comando
+   sem setar `_newCommand`; o dispatch nunca o processa. A parada remota pelo
+   canal principal não existe (só o ESP-NOW para).
+2. **Dump remoto trunca a última coluna** — `_dumpLinha[96]` é pequeno demais
+   para a linha de 16 colunas (medido: 98 bytes no caso real, ~141 no pior
+   caso). O dump via WebSocket/ESP-NOW sai cortado e o replay descarta a linha.
+3. **Dump por serial pode reiniciar o robô** — `recorder.dump()` despeja até
+   1700 linhas (~13 s) bloqueando o `loop()`, acima do WDT de 5 s. O teste
+   registrado (452 amostras) passou por estar abaixo do limite.
+4. **Reancoragem duplicada 6× e já divergente** — o restart por serial não
+   reancora o rumo; o segundo quadrado consecutivo herda o rumo do anterior.
+
+**Divergências de média severidade:** comandos seriais do Manual que o código
+não aceita (e `g` inicia o quadrado em vez do pivô); instrução de
+`ESPNOW_CHANNEL` apontando macro removida; Roteiro ESP-NOW prometendo CSV que a
+ponte não grava; contagem de testes do TODO (real: 33 nativos / 15 Python);
+três formatos de CSV divergentes (16/17/19 colunas).
+
+**Código morto:** 18 macros/funções sem uso, 3 estados inalcançáveis e
+redundâncias (mapeamento estado→string 3×, leituras de sensor 4-6× por ciclo).
+
+**Descartado após verificação:** a suspeita de `snprintf` com 17 especificadores
+e 16 argumentos é **falsa** (são 16/16); `abs()` em float está correto no core
+3.3.12.
+
+---
+
+---
+

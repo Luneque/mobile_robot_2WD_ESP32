@@ -72,6 +72,7 @@ Teste_car_0/
     ├── FSD.md                 # Especificação Funcional Definitiva (v4.0.0 em PT-BR)
     ├── MANUAL_TECNICO.md      # Manual completo de pinagem, cinemática, operação e compilação
     ├── ROTEIRO_ESPNOW.md      # Validação da ponte robô <-> gateway ESP32
+    ├── REVISAO_ENGENHARIA.md  # Auditoria de código × doc e plano de melhorias
     └── DIARIO_ENGENHARIA.md   # Registro cronológico detalhado da evolução do projeto
 ```
 
@@ -99,6 +100,7 @@ Teste_car_0/
 * 📄 **[Especificação Funcional (FSD v4.0)](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/FSD.md)**
 * 📄 **[Roteiro de Validação do Enlace ESP-NOW](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/ROTEIRO_ESPNOW.md)**
 * 📄 **[Diário de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/DIARIO_ENGENHARIA.md)**
+* 📄 **[Revisão de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/REVISAO_ENGENHARIA.md)** — auditoria de código × documentação e plano de melhorias
 
 ## 📄 Atualizações Recentes (19/11/2026)
 

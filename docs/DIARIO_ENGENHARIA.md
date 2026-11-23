@@ -469,6 +469,7 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 - **Diagnóstico:** `g_yawOdom`, `diverg`, `gyroBias` com autoteste no boot; comandos `reta` (`t`) e `pivô` (`g`).
 - **Resultado no solo:** fechamento de 7,8–8,7 mm; pivôs 88,2–90,7°; mapa fechando em ~7 mm.
 - **Documentação:** README, FSD, Manual, TODO e Diário atualizados para os valores vigentes.
+- **Revisão de engenharia (19/11/2026):** auditoria completa de código × documentação em `docs/REVISAO_ENGENHARIA.md` — 4 defeitos de alta severidade (stop via WebSocket descartado, dump remoto truncado, dump serial acima do WDT, reancoragem duplicada 6×) e plano de melhorias em P1/P2/P3.
 
 ## 📄 Atualizações Recentes (16/11/2026)
 
