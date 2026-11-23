@@ -471,7 +471,7 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 - **Documentação:** README, FSD, Manual, TODO e Diário atualizados para os valores vigentes.
 - **Revisão de engenharia (19/11/2026):** auditoria completa de código × documentação em `docs/REVISAO_ENGENHARIA.md` — 4 defeitos de alta severidade (stop via WebSocket descartado, dump remoto truncado, dump serial acima do WDT, reancoragem duplicada 6×) e plano de melhorias em P1/P2/P3.
 - **Monitor de bateria (19/11/2026):** divisor R1=100k/R2=47k + 100 nF montado no GPIO 34; ganho real 0,00273 V/ADC; limiares 7,0/6,6 V; corte em `ESTADO_EMERGENCIA`; telemetria `vbat`; calibração persistida na NVS.
-- **Particionamento da flash (23/11/2026):** esquema sob medida em `firmware_robo2wd_v4/partitions.csv` — SPIFFS de 1,38 MB → 1,25 MB e coredump antecipado para 0x3D0000, com 128 KB de reserva. Slots de app mantidos em 1,25 MB (OTA/reversão).
+- **Particionamento da flash (23/11/2026):** esquema sob medida em `firmware_robo2wd_v4/partitions.csv`. Depois de duas iterações, decidido o **slot único + SPIFFS mínima**: app 3,75 MB (folga ~2,6 MB), SPIFFS 64 KB, coredump 64 KB e 64 KB livres. Contrapartida assumida: sem slot de rollback, a recuperação de uma imagem defeituosa é só via cabo USB.
 
 ## 📄 Atualizações Recentes (16/11/2026)
 

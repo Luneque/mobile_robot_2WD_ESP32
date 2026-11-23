@@ -1,25 +1,26 @@
 # Name,   Type, SubType, Offset,  Size, Flags
 # Esquema sob medida para o robo 2WD (Teste_car_0), flash de 4 MB.
 #
-# Mudancas em relacao ao "default.csv" do Arduino:
-#   - SPIFFS: 0x160000 (1,38 MB) -> 0x140000 (1,25 MB). O firmware nao usa
-#     SPIFFS/LittleFS (o dashboard e' servido de PROGMEM); o espaco e' mantido
-#     como area de dados geral, sem a ociosidade do default.
-#   - App0/App1: inalterados (0x140000 = 1,31 MB cada). O firmware usa
-#     1,15 MB, sobram ~160 KB por slot. Sao mantidos os dois slots para
-#     permitir OTA/reversao futura.
+# Decisao (23/11/2026): SLOT UNICO de app + SPIFFS minima.
+#   - O firmware usa ~1,15 MB e nao tem OTA implementado; a particao SPIFFS
+#     nao e' usada por nada (o dashboard e' servido de PROGMEM).
+#   - Com um slot so' o ganho real aparece: o app passa de 1,31 MB para
+#     3,75 MB. Contrapartida assumida explicitamente: sem slot de rollback,
+#     a recuperacao de uma imagem defeituosa passa a ser somente via cabo USB.
+#   - SPIFFS reduzida a 64 KB (area de dados minima, para um arquivo pequeno
+#     futuro, se fizer sentido).
+#   - NVS mantida em 0x9000 (mesmo offset dos esquemas anteriores): credenciais
+#     Wi-Fi, calibragem da IMU e a calibracao da bateria sobrevivem ao reflash.
 #
 # Mapa resultante (flash 4 MB = 0x400000):
-#   0x009000  nvs        0x5000    20 KB   (Wi-Fi/calibragem + namespace "bateria")
-#   0x00E000  otadata    0x2000     8 KB   (estado do OTA)
-#   0x010000  app0       0x140000   1,31 MB (firmware atual)
-#   0x150000  app1       0x140000   1,31 MB (slot OTA / reversao)
-#   0x290000  spiffs     0x140000   1,25 MB (dados gerais)
-#   0x3D0000  coredump   0x10000    64 KB   (captura de panic)
-#   0x3E0000  (livre)    0x20000   128 KB   (reserva)
+#   0x009000  nvs        0x5000     20 KB   (Wi-Fi/calibragem + namespace "bateria")
+#   0x00E000  otadata    0x2000      8 KB   (estado do OTA)
+#   0x010000  app0       0x3C0000    3,75 MB (firmware — unico slot)
+#   0x3D0000  spiffs     0x10000     64 KB   (dados gerais, minimo)
+#   0x3E0000  coredump   0x10000     64 KB   (captura de panic)
+#   0x3F0000  (livre)    0x10000     64 KB   (reserva)
 nvs,      data, nvs,      0x9000,  0x5000,
 otadata,  data, ota,      0xe000,  0x2000,
-app0,     app,  ota_0,    0x10000, 0x140000,
-app1,     app,  ota_1,    0x150000,0x140000,
-spiffs,   data, spiffs,   0x290000,0x140000,
-coredump, data, coredump, 0x3D0000,0x10000,
+app0,     app,  ota_0,    0x10000, 0x3C0000,
+spiffs,   data, spiffs,   0x3D0000,0x10000,
+coredump, data, coredump, 0x3E0000,0x10000,

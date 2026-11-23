@@ -179,26 +179,41 @@ O robô grava telemetria em RAM a 20 Hz (1700 amostras, 85 s) — ideal para tes
 ## 2.1 Particionamento da flash (4 MB)
 
 Esquema sob medida em `firmware_robo2wd_v4/partitions.csv` (o Arduino copia o
-CSV do sketch na frente do `default.csv`). Gravado no chip em 23/11/2026.
+CSV do sketch por cima do `default.csv`). Gravado no chip em 23/11/2026.
 
 | Partição | Tipo | Offset | Tamanho | Uso |
 | :--- | :--- | :--- | :--- | :--- |
 | nvs | data/nvs | 0x009000 | 20 KB | Wi-Fi, calibração da IMU, namespace `bateria` |
 | otadata | data/ota | 0x00E000 | 8 KB | estado do OTA |
-| app0 | app/ota_0 | 0x010000 | **1,25 MB** | firmware atual |
-| app1 | app/ota_1 | 0x150000 | **1,25 MB** | slot de OTA / reversão |
-| spiffs | data/spiffs | 0x290000 | **1,25 MB** | dados gerais |
-| coredump | data/coredump | 0x3D0000 | 64 KB | captura de panic |
-| *(livre)* | — | 0x3E0000 | 128 KB | reserva |
+| app0 | app/ota_0 | 0x010000 | **3,75 MB** | firmware (slot único) |
+| spiffs | data/spiffs | 0x3D0000 | **64 KB** | dados gerais (mínimo) |
+| coredump | data/coredump | 0x3E0000 | 64 KB | captura de panic |
+| *(livre)* | — | 0x3F0000 | 64 KB | reserva |
 
-- **Antes (esquema Arduino "default"):** SPIFFS de 1,38 MB terminando em
-  0x3F0000 e coredump por último. O firmware não usa SPIFFS/LittleFS.
-- **Depois:** SPIFFS 1,25 MB e coredump antecipado para 0x3D0000, sobrando
-  128 KB de reserva. Os slots de app foram mantidos em 1,25 MB cada para
-  preservar a possibilidade de OTA/reversão.
-- **Folga:** o firmware usa ~1,15 MB por slot, sobram ~100 KB em cada um.
-- **Atenção:** trocar de esquema apaga a NVS; como o offset da NVS é o mesmo
-  (0x9000), a calibração da bateria e as credenciais Wi-Fi **sobreviveram**.
+**Decisão:** slot único + SPIFFS mínima. O firmware usa ~1,15 MB, não tem OTA
+implementado e não usa SPIFFS/LittleFS (o dashboard é servido de PROGMEM).
+Com um slot só a folga real aparece: **~2,6 MB** por imagem (contra ~100 KB
+antes).
+
+**Contrapartida assumida:** sem o segundo slot **não há rollback**. Se uma
+imagem nova falhar, a recuperação é somente gravando pelo cabo USB. Para
+recuperar o rollback, basta voltar ao esquema anterior (dois slots de 1,25 MB)
+— o `partitions.csv` é versionado.
+
+**Nota sobre o relatório de compilação:** o `boards.txt` do core tem
+`upload.maximum_size=1310720` **fixo**, então o compilador informa
+"Maximum is 1310720 bytes" mesmo com um slot de 3,75 MB. É cosmético (o que vai
+para o chip é o `partitions.bin`), mas para o número correto:
+
+```bash
+arduino-cli compile --fqbn esp32:esp32:esp32 \
+  --build-property upload.maximum_size=3932160 firmware_robo2wd_v4
+# Sketch uses 1148411 bytes (29%) of program storage space. Maximum is 3932160 bytes.
+```
+
+**Atenção:** trocar de esquema apaga a NVS; como o offset da NVS é o mesmo
+(0x9000), a calibração da bateria e as credenciais Wi-Fi **sobrevivem** —
+confirmado no chip após a mudança ("Calibragem carregada da NVS").
 
 ---
 
