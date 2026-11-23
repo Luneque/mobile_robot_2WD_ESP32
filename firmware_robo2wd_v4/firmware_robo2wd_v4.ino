@@ -686,6 +686,7 @@ void setup() {
 
     // 8. Monitor de bateria (divisor R1=100k/R2=47k no GPIO 34)
     battery.begin();
+    battery.carregarCalibracao();   // restaura a calibragem gravada na NVS
     if (battery.isEnabled()) {
         g_vbat = battery.readVolts();
         Serial.print(F("[BATERIA] Monitor ativo no GPIO "));
@@ -702,7 +703,9 @@ void setup() {
             Serial.println(F(" V)"));
             if (!battery.isCalibrated()) {
                 Serial.println(F("[BATERIA] SEM CALIBRACAO: usando a curva nominal do ADC."));
-                Serial.println(F("[BATERIA] Mecca a bateria no multimetro e aplique a calibracao de 2 pontos."));
+                Serial.println(F("[BATERIA] Mecca a bateria no multimetro e envie 'vbat <tensao>'."));
+            } else {
+                Serial.println(F("[BATERIA] Calibragem carregada da NVS."));
             }
         } else {
             Serial.println(F("sem leitura (divisor nao montado?)."));
@@ -910,6 +913,7 @@ void loop() {
             if (alvo > 0.0f && battery.isEnabled()) {
                 float adc = battery.lastAdc();
                 battery.setCalibracao(adc, alvo, 0.0f, 0.0f);
+                battery.salvarCalibracao();   // persiste na NVS (sobrevive ao reboot)
                 g_vbat = battery.readVolts();
                 Serial.print(F("[BATERIA] Calibrada: adc "));
                 Serial.print(adc, 0);
@@ -917,7 +921,7 @@ void loop() {
                 Serial.print(alvo, 2);
                 Serial.print(F(" V | leitura atual: "));
                 Serial.print(g_vbat, 2);
-                Serial.println(F(" V"));
+                Serial.println(F(" V (gravada na NVS)"));
             } else {
                 Serial.println(F("[BATERIA] Calibragem invalida (use 'vbat <tensao>')."));
             }

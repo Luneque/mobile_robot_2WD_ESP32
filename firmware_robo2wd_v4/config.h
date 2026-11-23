@@ -32,13 +32,15 @@
 #define VBAT_R1_OHMS       100000.0f
 #define VBAT_R2_OHMS        47000.0f
 #define VBAT_DIVIDER       ((VBAT_R1_OHMS + VBAT_R2_OHMS) / VBAT_R2_OHMS)  // ~3,128
-// Calibracao nominal do fundo de escala: com atenuacao de 11 dB o ADC do ESP32
-// satura bem antes de 2,5 V. Medido em 19/11/2026: divisor R1=100k/R2=47k com
-// bateria de 8,22 V le adc = 3060. O segundo ponto (vazio) e' estimado pelo
-// ganho real do divisor, ~0,2626 V por unidade de ADC.
+// Calibracao do divisor: com atenuacao de 11 dB o ADC do ESP32 NAO e' linear
+// e satura bem antes de 2,5 V, entao a curva nominal (adc/4095 * 2,5) erra
+// por um fator de ~96. Medido em 19/11/2026 com o divisor R1=100k/R2=47k:
+//   bateria 8,22 V  ->  adc 3013   =>  ganho real ~0,00273 V/ADC
+// O ganho e' derivado do divisor (V/ADC = Vadc_por_tick * (R1+R2)/R2), mas o
+// fundo de escala real do ADC com 11 dB e' ~0,84 V, nao 2,5 V.
 // Para recalibrar: meca a bateria no multimetro e envie "vbat <tensao_real>".
-#define VBAT_ADC_REF_VOLTS  0.2626f   // V por unidade de ADC (ganho real do divisor)
-#define VBAT_ADC_REF_ZERO   0.0f      // ADC em 0 V (offset)
+#define VBAT_ADC_REF_VOLTS  0.002728f  // V por unidade de ADC (ganho real, medido)
+#define VBAT_ADC_REF_ZERO   0.0f       // ADC em 0 V (offset)
 #define VBAT_ADC_ATTEN     11      // atenuacao do ADC (11 dB)
 #define VBAT_AMOSTRAS      16      // media para suavizar o ruido do ADC
 #define VBAT_LIMIAR_ATENCAO 7.0f   // V: avisa no painel/telemetria
