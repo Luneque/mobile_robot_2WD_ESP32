@@ -28,7 +28,7 @@ A versão oficial do firmware (**Versão 4**) opera com:
 2. **Atuadores:** 2 Micromotores DC com redução metálica homologada de **1:90**.
 3. **Sensores de Velocidade:** Encoders magnéticos de efeito Hall (disco magnético de **12 PPR** por canal).
 4. **Acionamento de Potência:** ESC escovado duplo bidirecional configurado no modo independente (*Mixed Control = OFF*).
-5. **Alimentação:** Bateria LiPo 2S (~7.4 V).
+5. **Alimentação:** Bateria LiPo 2S (~7,4 V), monitorada por divisor R1=100k/R2=47k com capacitor de 100 nF no GPIO 34 (ADC1_CH6). Limiares: 7,0 V (atenção) e 6,6 V (corte, 3,30 V/célula).
 
 ### 2.2 Diagrama de Pinagem e Conexões Físicas
 

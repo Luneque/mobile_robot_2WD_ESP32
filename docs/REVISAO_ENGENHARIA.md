@@ -360,7 +360,7 @@ confirmam — registradas aqui para não serem "redescobertas":
 | — | Gravar `yawReal`/`inercia` no gravador e nos CSVs | +12 bytes/amostra (40→52); o buffer vai a ~88 KB. Ainda cabe, mas convém reduzir `REC_MAX_SAMPLES` para ~1300 para manter 85 s |
 | — | `reta`/`pivo` no gateway ESP-NOW | hoje a ponte só oferece start/stop/pause/reset/dump |
 | — | Botão de STOP no dashboard | depende de 2.1 |
-| — | Monitor de bateria | adiado; divisor não montado, calibração com multímetro obrigatória |
+| — | Monitor de bateria | **ATENDIDO (19/11/2026)** — divisor R1=100k/R2=47k + 100 nF montado no GPIO 34; driver `battery_monitor.h`, limiares 7,0/6,6 V, corte em `ESTADO_EMERGENCIA`, telemetria `vbat` e calibração persistida na NVS |
 | — | Escala de distância (TODO item 22) | ticks dizem 503–504 mm; medido 480 mm. Se resolver, revisar `PPR_EFETIVO`/diâmetro e o mapa de uma vez |
 | — | Limitar `csvRows`/`trajectory` no dashboard | crescimento sem teto no browser |
 | — | Validar `Wire.endTransmission()` na IMU | hoje falha de I2C é indistinguível de "parado" |

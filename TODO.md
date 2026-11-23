@@ -42,7 +42,10 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 2. **Monitor de bateria não implementado.**
    - `PIN_BATTERY_ADC = -1` (desabilitado) e nenhuma leitura de tensão no firmware.
    - Sem proteção contra LiPo 2S profunda: risco real de dano à bateria e de o robô parar no meio do percurso.
-   - **Adiado por decisão do usuário (16/11/2026).** Projeto já levantado: divisor R1=100k/R2=47k em GPIO 34 (ADC1_CH6), `ADC_11db`, fundo de escala ~2,5 V, limiares 7,0 V (atenção) / 6,6 V (corte, 3,30 V/célula), telemetria `vbat` + corte em `ESTADO_EMERGENCIA`. Pendência: divisor não está montado; calibração com multímetro é obrigatória.
+   - **Divisor de tensão (validado em 19/11/2026):** R1 = 100 kΩ (bateria → GPIO) e R2 = 47 kΩ (GPIO → GND), com **C = 100 nF em paralelo com R2** (filtro). O capacitor é o que mantém a leitura estável (ADC entre 2991 e 3024 em 40 leituras). Atenuação de 11 dB no ADC.
+  - **Ganho real medido:** ~**0,00273 V/ADC** — 8,22 V nos terminais deram ADC 3013.
+  - **O ADC do ESP32 com 11 dB não é linear:** a curva nominal (`adc/4095 × 2,5 V`) superestima por um fator de ~96. Por isso a calibração com multímetro é obrigatória.
+  - **Recalibrar:** meça a bateria no multímetro e envie `vbat <tensão>` pelo dashboard; o valor fica gravado na NVS e sobrevive ao reboot.
 
 3. **Sem proteção de baixa tensão / sem telemetria de corrente.**
    - Relacionado ao item anterior. O ESC é escovado (bidirecional duplo) de 2-3S; operar abaixo de ~6,4 V danifica a célula.
