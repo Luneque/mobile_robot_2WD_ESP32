@@ -109,7 +109,27 @@ bool g_emLinhaReta = true; // true = reta, false = giro de 90°
 
 uint32_t g_lastLoopTime = 0;
 uint32_t g_desbalStartTime = 0;
+
+// Diagnostico de travamento do laco: maior intervalo entre duas iteracoes
+// consecutivas de loop(). Publicado como "lm" na telemetria e zerado a cada
+// amostra. Um valor alto significa que o controle ficou congelado por aquele
+// periodo com os motores no ultimo PWM aplicado.
+uint32_t g_loopAnteriorMs = 0;
+uint32_t g_loopMaxMs = 0;
 uint32_t g_pausaStartTime = 0;
+
+// Diagnostico de secao lenta: maior duracao de um bloco do loop() desde a
+// ultima amostra de telemetria, e qual bloco foi (id). Publicado como "sr"
+// (ms) e "si" (id). So' com isto e' possivel localizar a origem de um "lm"
+// alto sem adivinhar: Wi-Fi=1, telemetria=2, gravador=3, bateria=4,
+// controle/FSM=5.
+uint32_t g_secMaxUs = 0;
+uint8_t  g_secId    = 0;
+
+static inline void marcarSecao(uint8_t id, uint32_t t0) {
+    uint32_t d = (uint32_t)(micros() - t0);
+    if (d > g_secMaxUs) { g_secMaxUs = d; g_secId = id; }
+}
 
 int32_t g_targetTicks = 0;
 float g_distanciaTotalMm = 0.0f;
@@ -502,8 +522,15 @@ void enviarTelemetria(uint32_t now) {
     pkt.rpmAlvo    = (estadoAtual == ESTADO_EXECUTANDO_TRAJETORIA) ? g_rpmAlvo : 0.0f;
     pkt.vbat       = g_vbat;
     pkt.vbatNivel  = g_vbatNivel;
+    pkt.loopMaxMs  = g_loopMaxMs;
+    pkt.secMs      = g_secMaxUs / 1000.0f;   // pior bloco desde a última amostra
+    pkt.secId      = g_secId;                // 1 Wi-Fi, 2 telemetria, 3 gravador,
+                                             // 4 bateria, 5 controle/FSM
 
     wirelessTelem.sendTelemetry(pkt);
+    g_loopMaxMs = 0;   // a janela recomeça na próxima amostra
+    g_secMaxUs = 0;
+    g_secId    = 0;
 }
 
 // =========================================================================
@@ -789,9 +816,19 @@ void setup() {
 void loop() {
     uint32_t now = millis();
 
+    // Mede o periodo da iteracao anterior (overflow de millis() e' seguro).
+    if (g_loopAnteriorMs != 0) {
+        uint32_t periodo = now - g_loopAnteriorMs;
+        if (periodo > g_loopMaxMs) g_loopMaxMs = periodo;
+    }
+    g_loopAnteriorMs = now;
+
+    uint32_t _tSec;
+
     // Mantem o Wi-Fi vivo. O g_wifiOk era setado uma unica vez no setup e nunca
     // re-verificado: uma queda de Wi-Fi deixava o dashboard "desconectado" ate
     // um reboot, e o ESP32 nao reconecta de forma confiavel sozinho.
+    _tSec = micros();
     if (WiFi.status() != WL_CONNECTED) {
         if (g_wifiOk) {
             g_wifiOk = false;
@@ -812,6 +849,7 @@ void loop() {
     if (g_wifiOk) {
         wirelessTelem.handle();
     }
+    marcarSecao(1, _tSec);   // seção 1: Wi-Fi/WS
 
     // Alimenta o Watchdog se o sistema estiver operando normalmente
     if (estadoAtual != ESTADO_FALHA_HARDWARE) {
@@ -820,10 +858,18 @@ void loop() {
 
     // Envio periódico de telemetria sem fio (adaptativo: 20 Hz em movimento)
     if (estadoAtual != ESTADO_FALHA_HARDWARE) {
+        _tSec = micros();
         enviarTelemetria(now);
         enviarTelemEspNow(now);
+        marcarSecao(2, _tSec);       // seção 2: telemetria (WS + ESP-NOW)
+
+        _tSec = micros();
         gravarAmostraRecorder(now);
+        marcarSecao(3, _tSec);       // seção 3: gravador em RAM
+
+        _tSec = micros();
         monitorarBateria(now);
+        marcarSecao(4, _tSec);       // seção 4: monitor de bateria
     }
 
     // Comando de dump do gravador via Serial ('d') ou WebSocket ("dump")
@@ -1022,6 +1068,7 @@ void loop() {
 
         case ESTADO_EXECUTANDO_TRAJETORIA:
             // Stop/pause remotos são tratados de forma centralizada no topo do loop().
+            _tSec = micros();
 
             if (subEstado == SUB_INICIAR_SEGMENTO) {
                 if (g_emLinhaReta) {
@@ -1086,6 +1133,7 @@ void loop() {
                     }
                 }
             }
+            marcarSecao(5, _tSec);   // seção 5: controle/FSM (inclui leitura da IMU)
             break;
 
         case ESTADO_CONCLUIDO:

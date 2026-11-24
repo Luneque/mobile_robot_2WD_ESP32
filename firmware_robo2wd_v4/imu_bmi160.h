@@ -24,7 +24,16 @@ public:
 
     bool begin(uint8_t addr = BMI160_DEFAULT_ADDR) {
         _addr = addr;
-        Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 400000); // 400 kHz Fast Mode
+        // 100 kHz e' bem mais tolerante a ruido/EMI que 400 kHz: os motores
+        // escovados injetam ruido no barramento e uma transacao perdida antes
+        // travava o laco por ~1 s (ver diagnostico de "lm").
+        Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 100000);
+        // Sem setTimeOut() o driver I2C do core ESP32 espera ate 1000 ms por
+        // transacao. Medimos travamentos de 917 ms e 1062 ms (uma transacao)
+        // e de 2080 ms (duas), sempre com os motores ligados — o controle
+        // ficava congelado com os motores no ultimo PWM e o robo perdia a
+        // trajetoria. Com 5 ms a falha e' rapida e a integracao segue.
+        Wire.setTimeOut(5);
 
         // 1. Verificar Chip ID (deve ser 0xD1)
         uint8_t chip_id = readReg(_addr, BMI160_CHIP_ID_REG);

@@ -74,6 +74,9 @@ struct TelemetryPacket {
     float       rpmAlvo;     // RPM alvo do perfil trapezoidal
     float       vbat;        // tensao da bateria (V); -1 = desabilitado
     uint8_t     vbatNivel;   // 0 ok, 1 atencao, 2 critico
+    uint32_t    loopMaxMs;   // maior intervalo entre duas iteracoes do loop desde a ultima amostra
+    float       secMs;       // duracao (ms) do pior bloco do loop desde a ultima amostra
+    uint8_t     secId;       // id do pior bloco: 1 Wi-Fi, 2 telemetria, 3 gravador, 4 bateria, 5 controle
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -587,6 +590,9 @@ public:
         doc["rt"]  = roundf(pkt.rpmAlvo * 10.0f) / 10.0f;
         doc["vbat"] = roundf(pkt.vbat * 100.0f) / 100.0f;
         doc["vbatNivel"] = pkt.vbatNivel;
+        doc["lm"] = pkt.loopMaxMs;
+        doc["sr"] = roundf(pkt.secMs * 10.0f) / 10.0f;   // pior bloco (ms)
+        doc["si"] = pkt.secId;                            // id do pior bloco
 
         String json;
         serializeJson(doc, json);

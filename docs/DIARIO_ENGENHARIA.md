@@ -461,6 +461,26 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 * **`tests/`:** Testes automatizados sem hardware — `tests/native/` (16 + 17 testes sobre `robo_matematica.h` e o critério de corte do pivô) e `tests/python/` (15 testes de ferramentas, cabeçalhos e do JS do dashboard). Rodados no CI.
 * **`ferramentas/`:** Geradores de assets (ex.: `gerar_chartjs_asset.py`, que publica o Chart.js gzip em PROGMEM).
 
+## 📄 Atualizações Recentes (24/11/2026)
+
+### Firmware — travamento do laço durante a trajetória
+
+O robô passou a perder a trajetória no solo: o laço de controle congelava por ~1 s com os motores no último PWM (o robô continuava girando/andando e saía do previsto). Medido com o campo `lm` da telemetria (maior intervalo entre iterações do `loop()` desde a última amostra):
+
+- Travamentos de **917 ms, 1062 ms** e **2080–2496 ms**, sempre com os motores ligados; parado, o `lm` fica em 4–7 ms.
+- O fenômeno **não é regressão** da Revisão nº 1: o log de 19/11 (`quadrado_mapa2`) já trazia um buraco de **2080 ms**, com a RETA L2 passando de 7.597 para 16.245 ticks durante o congelamento e o rumo derivando −10°.
+- **Causa:** o driver `Wire` do core ESP32 usa timeout padrão de **1000 ms por transação**. Os motores escovados injetam EMI no barramento I2C (400 kHz); uma transação perdida travava o laço — uma falha explicava ~1 s, duas seguidas ~2 s.
+- **Correção (`imu_bmi160.h`):** `Wire.setTimeOut(5)` e barramento de 400 kHz → **100 kHz**.
+- **Validação:** 5 quadrados consecutivos com `lm` máximo de **15–17 ms** (pior bloco: a seção de controle, ~12 ms). Fechamento de 17,6–29,2 mm com a bateria já em 7,53–7,59 V.
+
+### Diagnóstico permanente na telemetria
+
+Além do `lm`, a telemetria passou a publicar **`sr`** (duração do pior bloco do laço) e **`si`** (qual bloco: 1 Wi-Fi/WS, 2 telemetria, 3 gravador, 4 bateria, 5 controle/FSM). Travamentos futuros são localizados sem adivinhação.
+
+### Precisão depende da carga da LiPo
+
+Medição em bancada/solo com 4 pivôs: a **8,20 V** o giro real médio foi **90,24°** (soma 360,96°); a **7,46 V** caiu para **89,14°** (356,58°). O ponto de corte não muda — o que varia é a inércia (4,96° contra 3,97°). Testes de precisão devem rodar com a LiPo carregada.
+
 ## 📄 Atualizações Recentes (23/11/2026)
 
 ### Firmware — resolução dos bugs da Revisão nº 1 (seção 1)
