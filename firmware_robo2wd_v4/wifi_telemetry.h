@@ -17,6 +17,16 @@
 #ifndef WIFI_TELEMETRY_H
 #define WIFI_TELEMETRY_H
 
+// A publicacao de telemetria e o atendimento do socket ficam em uma tarefa
+// dedicada. A escrita no TCP e' sincrona: quando o peer nao drena, ela
+// bloqueia por ate ~1 s (timeout de retransmissao) e, como era feita dentro
+// do loop de controle, congelava o controle com os motores no ultimo PWM —
+// o robô saia da trajetoria. O laço apenas enfileira, sem esperar.
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/semphr.h>
+#include <freertos/task.h>
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Includes
 // ─────────────────────────────────────────────────────────────────────────────
@@ -547,22 +557,48 @@ public:
         Serial.print(F("[WS] WebSocket na porta "));
         Serial.println(WIFI_WS_PORT);
 
+        // Tarefa de rede: publica telemetria e atende o socket fora do laço de
+        // controle (ver comentário no topo do arquivo).
+        _mutexRede = xSemaphoreCreateMutex();
+        _filaTelem = xQueueCreate(8, sizeof(TelemetryPacket));
+        xTaskCreatePinnedToCore(taskTelem, "telem", 4096, this, 1, NULL, 0);
+
         return true;
     }
 
     // -------------------------------------------------------------------------
-    // handle() — chamar no loop(): processa eventos WS e requisições HTTP
+    // handle() — atende eventos WS e requisições HTTP. Chamar da tarefa de rede.
     // -------------------------------------------------------------------------
     void handle() {
+        if (_mutexRede == NULL) return;
+        if (xSemaphoreTake(_mutexRede, pdMS_TO_TICKS(50)) != pdTRUE) return;
         _ws.loop();
         _http.handleClient();
+        xSemaphoreGive(_mutexRede);
     }
+
+    // -------------------------------------------------------------------------
+    // agendarTelemetria() — enfileira um pacote para a tarefa de rede.
+    // Nunca espera: se a fila estiver cheia, a amostra e' descartada. Assim o
+    // laço de controle nao pode ser bloqueado pela rede.
+    // -------------------------------------------------------------------------
+    void agendarTelemetria(const TelemetryPacket& pkt) {
+        if (_filaTelem == NULL) return;
+        xQueueSend(_filaTelem, &pkt, 0);
+    }
+
+    // Gancho para a telemetria ESP-NOW (implementada no .ino, que conhece os
+    // globals de enlace). Executado pela tarefa de rede; o laço não envia nada.
+    typedef void (*HookEspNow)();
+    void setHookEspNow(HookEspNow fn) { _hookEspNow = fn; }
 
     // -------------------------------------------------------------------------
     // sendTelemetry() — serializa TelemetryPacket em JSON e transmite via WS
     // -------------------------------------------------------------------------
     void sendTelemetry(const TelemetryPacket& pkt) {
-        if (!hasClients()) return;
+        if (_mutexRede == NULL || !hasClients()) return;
+        // Chamado apenas pela tarefa de rede; aqui bloquear nao tem problema.
+        if (xSemaphoreTake(_mutexRede, portMAX_DELAY) != pdTRUE) return;
 
         // Chaves curtas para economizar banda
         JsonDocument doc;
@@ -597,6 +633,7 @@ public:
         String json;
         serializeJson(doc, json);
         _ws.broadcastTXT(json);
+        xSemaphoreGive(_mutexRede);
     }
 
     // -------------------------------------------------------------------------
@@ -651,8 +688,32 @@ public:
     }
 
 private:
+    // -------------------------------------------------------------------------
+    // Tarefa de rede — publica telemetria e atende o socket fora do laço.
+    // Roda no core 0 (o loop do Arduino fica no core 1) com prioridade minima,
+    // para nao competir com o controle.
+    // -------------------------------------------------------------------------
+    static void taskTelem(void* arg) {
+        ((WifiTelemetry*)arg)->tarefaTelem();
+    }
+
+    void tarefaTelem() {
+        TelemetryPacket pkt;
+        for (;;) {
+            if (xQueueReceive(_filaTelem, &pkt, pdMS_TO_TICKS(20)) == pdTRUE) {
+                sendTelemetry(pkt);
+            }
+            handle();
+            if (_hookEspNow) _hookEspNow();
+        }
+    }
+
     WebServer         _http{WIFI_HTTP_PORT};
     WebSocketsServer  _ws{WIFI_WS_PORT};
+
+    SemaphoreHandle_t _mutexRede = NULL;   // serializa o acesso a _ws/_http
+    QueueHandle_t     _filaTelem = NULL;   // pacotes a publicar
+    HookEspNow        _hookEspNow = NULL;   // envio ESP-NOW (implementado no .ino)
 
     volatile bool _newCommand = false;  // flag para novo comando recebido
     char          _lastCmd    = '\0';   // último comando

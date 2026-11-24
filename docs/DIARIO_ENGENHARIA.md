@@ -469,9 +469,10 @@ O robô passou a perder a trajetória no solo: o laço de controle congelava por
 
 - Travamentos de **917 ms, 1062 ms** e **2080–2496 ms**, sempre com os motores ligados; parado, o `lm` fica em 4–7 ms.
 - O fenômeno **não é regressão** da Revisão nº 1: o log de 19/11 (`quadrado_mapa2`) já trazia um buraco de **2080 ms**, com a RETA L2 passando de 7.597 para 16.245 ticks durante o congelamento e o rumo derivando −10°.
-- **Causa:** o driver `Wire` do core ESP32 usa timeout padrão de **1000 ms por transação**. Os motores escovados injetam EMI no barramento I2C (400 kHz); uma transação perdida travava o laço — uma falha explicava ~1 s, duas seguidas ~2 s.
-- **Correção (`imu_bmi160.h`):** `Wire.setTimeOut(5)` e barramento de 400 kHz → **100 kHz**.
-- **Validação:** 5 quadrados consecutivos com `lm` máximo de **15–17 ms** (pior bloco: a seção de controle, ~12 ms). Fechamento de 17,6–29,2 mm com a bateria já em 7,53–7,59 V.
+- **Causa raiz:** a publicação de telemetria fazia **escrita síncrona no socket TCP dentro do laço de controle**. O campo `si` mostrou que 3 de 3 travamentos estavam na seção de telemetria (`si=2`), com duração igual à do `lm` (~917/754/2143 ms) — tempo de retransmissão TCP, quando o peer não drena. O laço congelava com os motores no último PWM.
+- **Correção definitiva (`wifi_telemetry.h`):** toda a I/O de rede saiu do laço. Uma tarefa dedicada (`telem`, core 0, prioridade mínima) atende o socket (`handle()`), publica a telemetria e emite a telemetria ESP-NOW; o laço apenas enfileira pacotes (`agendarTelemetria()`, que nunca espera — descarta se a fila encher). Um mutex serializa o acesso a `_ws`/`_http`.
+- **Correção parcial anterior (`imu_bmi160.h`):** `Wire.setTimeOut(5)` e barramento de 400 kHz → **100 kHz**. O timeout padrão do driver é 1000 ms por transação e os motores escovados injetam EMI no I2C — era um travamento real, mas não o dominante.
+- **Validação:** 4 quadrados consecutivos com `lm` máximo de **11–12 ms** (o laço nunca bloqueou), mesmo com um buraco de **1750 ms** na cadência da telemetria — a rede falhou sem afetar o controle. Fechamento de 6,4–21,4 mm (média 12,9) e erro de rumo de até 2,2°, com a bateria a 7,82–7,84 V.
 
 ### Diagnóstico permanente na telemetria
 

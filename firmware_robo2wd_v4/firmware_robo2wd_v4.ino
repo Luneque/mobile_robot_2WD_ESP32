@@ -121,8 +121,8 @@ uint32_t g_pausaStartTime = 0;
 // Diagnostico de secao lenta: maior duracao de um bloco do loop() desde a
 // ultima amostra de telemetria, e qual bloco foi (id). Publicado como "sr"
 // (ms) e "si" (id). So' com isto e' possivel localizar a origem de um "lm"
-// alto sem adivinhar: Wi-Fi=1, telemetria=2, gravador=3, bateria=4,
-// controle/FSM=5.
+// alta sem adivinhar: Wi-Fi=1, telemetria (fila)=2, gravador=3,
+// bateria=4, controle/FSM=5.
 uint32_t g_secMaxUs = 0;
 uint8_t  g_secId    = 0;
 
@@ -524,10 +524,11 @@ void enviarTelemetria(uint32_t now) {
     pkt.vbatNivel  = g_vbatNivel;
     pkt.loopMaxMs  = g_loopMaxMs;
     pkt.secMs      = g_secMaxUs / 1000.0f;   // pior bloco desde a última amostra
-    pkt.secId      = g_secId;                // 1 Wi-Fi, 2 telemetria, 3 gravador,
+    pkt.secId      = g_secId;                // 1 Wi-Fi, 2 telemetria (fila), 3 gravador,
                                              // 4 bateria, 5 controle/FSM
 
-    wirelessTelem.sendTelemetry(pkt);
+    // Enfileira para a tarefa de rede: o laço nao escreve no socket.
+    wirelessTelem.agendarTelemetria(pkt);
     g_loopMaxMs = 0;   // a janela recomeça na próxima amostra
     g_secMaxUs = 0;
     g_secId    = 0;
@@ -573,7 +574,10 @@ void monitorarBateria(uint32_t now) {
 // TELEMETRIA ESP-NOW (redundancia/alternativa ao Wi-Fi)
 // =========================================================================
 // Serializa o mesmo pacote em JSON e envia ao gateway ESP32.
-void enviarTelemEspNow(uint32_t now) {
+// Executada pela tarefa de rede (registrada com setHookEspNow), nao pelo
+// laço: esp_now_send tambem escreve no radio e pode bloquear.
+void enviarTelemEspNow() {
+    uint32_t now = millis();
     if (!g_espnowOk) return;
     // Mesma taxa adaptativa da telemetria WebSocket (20 Hz em movimento,
     // 2 Hz em repouso).
@@ -720,6 +724,8 @@ void setup() {
     Serial.println("[WIFI] Conectando a rede Wi-Fi...");
     g_wifiOk = wirelessTelem.begin();
     if (g_wifiOk) {
+        // Telemetria ESP-NOW passa a ser emitida pela tarefa de rede.
+        wirelessTelem.setHookEspNow(enviarTelemEspNow);
         Serial.printf("[OK] Wi-Fi conectado! IP: %s | Dashboard: http://robo.local/\n", wirelessTelem.getIP().c_str());
     } else {
         Serial.println(F("[AVISO] Wi-Fi nao conectou. Operando sem telemetria sem fio."));
@@ -845,11 +851,9 @@ void loop() {
         Serial.println(WiFi.localIP());
     }
 
-    // Processar eventos Wi-Fi/WebSocket
-    if (g_wifiOk) {
-        wirelessTelem.handle();
-    }
-    marcarSecao(1, _tSec);   // seção 1: Wi-Fi/WS
+    // Processar eventos Wi-Fi/WebSocket fica a cargo da tarefa de rede
+    // (wifi_telemetry.h), para nao bloquear o laço de controle.
+    marcarSecao(1, _tSec);   // seção 1: Wi-Fi
 
     // Alimenta o Watchdog se o sistema estiver operando normalmente
     if (estadoAtual != ESTADO_FALHA_HARDWARE) {
@@ -859,9 +863,8 @@ void loop() {
     // Envio periódico de telemetria sem fio (adaptativo: 20 Hz em movimento)
     if (estadoAtual != ESTADO_FALHA_HARDWARE) {
         _tSec = micros();
-        enviarTelemetria(now);
-        enviarTelemEspNow(now);
-        marcarSecao(2, _tSec);       // seção 2: telemetria (WS + ESP-NOW)
+        enviarTelemetria(now);          // so' enfileira; a tarefa de rede publica
+        marcarSecao(2, _tSec);          // seção 2: telemetria (enfileirada)
 
         _tSec = micros();
         gravarAmostraRecorder(now);
