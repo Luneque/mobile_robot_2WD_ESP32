@@ -846,6 +846,7 @@ void loop() {
         if (periodo > g_loopMaxMs) g_loopMaxMs = periodo;
     }
     g_loopAnteriorMs = now;
+    _controleAtualizouRpm = false;   // o controle deste ciclo ainda não rodou
 
     uint32_t _tSec;
 
