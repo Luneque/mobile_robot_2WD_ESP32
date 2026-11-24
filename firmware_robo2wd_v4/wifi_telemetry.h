@@ -190,7 +190,7 @@ const WIN = 75;
 // ---- Odometria / Mapa 2D ----
 const MM_PER_TICK = 0.04799656; // 66mm diametro / 4320 ticks
 let posX = 500, posY = 0; // Ponto de partida real: Início (500, 0)
-let prevTicks = 0, prevSegSide = -1, prevSegState = '';
+let prevTicks = 0;
 let trajectory = [{x: 500, y: 0}];
 let curHeadingDeg = 0;      // Rumo GLOBAL real (0 = +Y, 90 = +X), integrado do yaw
 let rumoReal = 0;          // Rumo global REAL (graus, anti-horario = positivo), ja com a inercia
@@ -201,7 +201,7 @@ function resetMap() {
   // Mantém o rumo global atual: o yaw do firmware é acumulado desde o
   // boot e não zera a cada trajeto, então zerar aqui dessintonizaria o mapa.
   curHeadingDeg = yawParaRumo(rumoReal);
-  prevTicks = 0; prevSegSide = -1; prevSegState = '';
+  prevTicks = 0;
   trajectory = [{x: 500, y: 0}];
   drawMap();
 }

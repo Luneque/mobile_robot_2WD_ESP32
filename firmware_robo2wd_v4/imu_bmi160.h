@@ -14,7 +14,6 @@
 
 #define BMI160_DEFAULT_ADDR 0x68
 #define BMI160_CHIP_ID_REG  0x00
-#define BMI160_DATA_REG     0x0C // Início dos dados: Gyr X (0x0C) até Acc Z (0x17)
 #define BMI160_CMD_REG      0x7E
 
 class IMU_BMI160 {

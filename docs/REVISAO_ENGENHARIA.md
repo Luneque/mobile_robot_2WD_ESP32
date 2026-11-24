@@ -292,6 +292,40 @@ re-verificados contra o código e a documentação vigentes:
 
 ## 4. Código Morto e Redundante
 
+**Verificação em 24/11/2026.** Varredura por símbolo em `firmware_robo2wd_v4/`:
+
+**Removido**
+
+- `ESC_PWM_FREQ_HZ` (`config.h`) — nunca consumida; a frequência é fixa em 50 Hz no MCPWM (`period_ticks = 20000`).
+- `BMI160_DATA_REG` (`imu_bmi160.h`) — definida e nunca usada.
+- `g_distanciaTotalMm` (`.ino`) — só escrita em `iniciarMovimentoReta()`, nunca lida.
+- `prevSegSide`/`prevSegState` (JS do dashboard) — só atribuídas.
+
+**Corrigido**
+
+- **`PPR_EFETIVO` passou a ser derivado**: `PPR_MOTOR * REDUCAO_MOTOR * QUADRATURA_MULT`
+  (12 × 90 × 4 = 4320), de modo que a aritmética documentada e o valor não podem divergir.
+- **`ESTADO_ARMANDO_ESC` ganhou `case`** no `switch` do `loop()`: transita para
+  `AGUARDO_INICIO`, eliminando o ramo morto apontado em 4.2.
+- **Reancoragem 6×** já resolvida no item 2.4 (`reancorarTrajetoria()`).
+- `PIN_BATTERY_ADC`, `ESPNOW_LINK_TIMEOUT_MS` e `g_lastEspnowRx` já estavam resolvidos
+  (monitor de bateria implementado; macro removida no item 2.7; variável removida junto).
+
+**Mantido com justificativa**
+
+- Métodos de leitura/estado dos drivers (`getDistanceM1_mm/M2_mm`, `getYawRateDps`,
+  `setTunings`, `getLastOutput`, `isInitialized`/`lastSendOk`/`isConnected`): são a interface
+  dos módulos e servem a diagnósticos futuros; nenhum custo em tempo de execução.
+- `REC_EST_PAUSA`, o badge `#badge.PAUSA` e a entrada `PAUSA` em `STATE_CLS`: mantêm o
+  estado que o JS documenta como possível; o estado ainda não é emitido pela FSM.
+- `recorder.restart()/overflow()/setRecording()`: API do gravador.
+- Mapeamento estado→string em três pontos (WebSocket, ESP-NOW, gravador): consolidar
+  exigiria mexer nas três saídas e um deles difere propositalmente (o ESP-NOW zera `rpmAlvo`).
+- `MM_PER_TICK` no JS duplica `MM_POR_PULSO`: o dashboard é PROGMEM e não enxerga macros
+  do firmware.
+- Leituras repetidas de sensores no ciclo: custo desprezível frente aos ~12 ms medidos para
+  o pior bloco.
+
 ### 4.1 Macros e variáveis sem uso
 
 Verificado por varredura em todo o firmware (`firmware_robo2wd_v4/`):

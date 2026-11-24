@@ -133,7 +133,6 @@ static inline void marcarSecao(uint8_t id, uint32_t t0) {
 }
 
 int32_t g_targetTicks = 0;
-float g_distanciaTotalMm = 0.0f;
 float g_anguloTotalGraus = 0.0f;
 // Sentido do giro. Convencao de sinal do BMI160 (eixo Z para cima): yaw
 // POSITIVO = rotacao ANTI-HORARIA. O mapa do dashboard renderiza -yaw.
@@ -221,7 +220,6 @@ float calcularRPMTrapezoidalCurva(int32_t currentTicks, int32_t targetTicks) {
 // =========================================================================
 
 void iniciarMovimentoReta(float distanciaMm) {
-    g_distanciaTotalMm = distanciaMm;
     g_targetTicks = ticksParaMm(distanciaMm);
     g_emLinhaReta = true;
     encoders.reset();
@@ -1027,6 +1025,12 @@ void loop() {
     }
 
     switch (estadoAtual) {
+        case ESTADO_ARMANDO_ESC:
+            // Só existe durante o setup(), antes do loop. Se algo o alcançar,
+            // trata como aguardo em vez de não fazer nada.
+            estadoAtual = ESTADO_AGUARDO_INICIO;
+            break;
+
         case ESTADO_FALHA_HARDWARE:
             motors.stopAll();
             g_lastPwm1 = ESC_NEUTRO_US;

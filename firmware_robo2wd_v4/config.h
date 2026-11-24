@@ -53,7 +53,9 @@
 #define PPR_MOTOR          12.0f
 #define REDUCAO_MOTOR      90.0f                // Redução Real Homologada 1:90
 #define QUADRATURA_MULT    4.0f                 // Modo Quadratura 4x
-#define PPR_EFETIVO        4320.0f              // 4320 pulsos por volta completa da roda (12 * 90 * 4)
+// Derivado dos fatores acima (12 * 90 * 4 = 4320): a documentação aritmética
+// e o valor não podem divergir.
+#define PPR_EFETIVO        (PPR_MOTOR * REDUCAO_MOTOR * QUADRATURA_MULT)
 
 #define DIAMETRO_RODA_MM   66.0f                // Diâmetro real calibrado da roda em mm (6.6 cm)
 #define CIRCUNF_RODA_MM    (PI * DIAMETRO_RODA_MM) // ~207.345 mm por volta da roda
@@ -63,7 +65,8 @@
 // ==========================================
 // 3. PARÂMETROS DO ESC (MCPWM Hardware 50Hz)
 // ==========================================
-#define ESC_PWM_FREQ_HZ    50       // Frequência do PWM em Hz (período de 20ms)
+// A frequência é fixa em 50 Hz: o MCPWM usa period_ticks = 20000 com timer de
+// 1 MHz (20 ms). Não existe macro para ela.
 
 // Limites em microssegundos (us)
 #define ESC_NEUTRO_US      1500     // Ponto neutro (motor parado)
