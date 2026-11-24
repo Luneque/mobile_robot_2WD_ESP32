@@ -24,7 +24,7 @@
 //   Gateway -> PC: "MAC: XX:XX:...\n" (endereço MAC no boot)
 //   Gateway -> PC: "DBG:<msg>\n"      (mensagens de debug)
 //
-// CANAL ESP-NOW: 1 (deve ser igual no robô)
+// CANAL ESP-NOW: 11 (definido por ESPNOW_CHANNEL; o robô usa o canal associado)
 // =========================================================================
 
 #include <WiFi.h>

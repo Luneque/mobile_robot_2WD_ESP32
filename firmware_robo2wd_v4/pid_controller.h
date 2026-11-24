@@ -16,7 +16,7 @@
 //   RPM esq:  0.0   0.0   3.9  30.2  60.0  81.2  98.7 111.9
 //   RPM dir:  0.0   0.0   0.0  39.8  70.1  92.1 107.1 119.2
 //   media:     0.0   0.0   1.9  35.0  65.0  86.7 102.9 115.6
-// Validada no solo: com fator 0.75, 55 RPM alvo -> ~1719 us -> ~55 RPM real.
+// Validada no solo: com fator 0.80, 55 RPM alvo -> ~1719 us -> ~55 RPM real.
 // =========================================================================
 static const float CURVA_RPM[] = {0.0f,  1.9f,  35.0f, 65.0f,  86.7f, 102.9f, 115.6f};
 static const float CURVA_PWM[] = {1600.0f, 1600.0f, 1650.0f, 1700.0f, 1750.0f, 1800.0f, 1850.0f};

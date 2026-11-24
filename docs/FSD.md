@@ -111,7 +111,7 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | **Velocidade de Cruzeiro** | `VELOCIDADE_CRUZEIRO_RPM` | `55.0f` | $\approx 190\text{ mm/s}$ nominal; ~58 RPM real medido em solo (feedforward por velocidade) |
 | **Velocidade Mínima de Rampa** | `VELOCIDADE_MIN_RPM` | `20.0f` | Garante torque inicial sem estolar o motor |
 | **Velocidade de Curva** | `VELOCIDADE_GIRO_RPM` | `25.0f` | $\approx 1,65\text{ s}$ por giro pivô de 90°; mais lento = menos inércia de frenagem no corte |
-| **Rampa de Aceleração** | `RAMPA_ACEL_DIST_MM` | `50.0f` | Aceleração ágil ($\approx 600\text{ mm/s}^2$) sem patinar |
+| **Rampa de Aceleração** | `RAMPA_ACEL_DIST_MM` | `50.0f` | Aceleração ágil ($\approx 310\text{ mm/s}^2$, por $v^2 = u^2 + 2as$) sem patinar |
 | **Rampa de Desaceleração** | `RAMPA_DESACEL_DIST_MM` | `60.0f` | Frenagem progressiva cravada na marca |
 | **Rampa de Giro (Acel/Desacel)**| `RAMPA_CURVA_ACEL/DESACEL` | `10.0° / 15.0°` | Transição suave no pivô de 90° |
 | **Antecipação de Corte do Pivô** | `PIVO_ANTECIPACAO_GRAUS` | `5,7°` | Corte em ~84°; a inércia de frenagem (~5°) completa os 90°. Pivôs medidos em 88,2–90,7° (média ≈ 89,7°) |
@@ -168,7 +168,7 @@ stateDiagram-v2
 - **Pivô recalibrado em solo:** `VELOCIDADE_GIRO_RPM` 35 → **25 RPM** e `PIVO_ANTECIPACAO_GRAUS` 0,7° → **5,7°**. A inércia cresce quando se antecipa o corte; o ponto ótimo medido foi 5,7° + 25 RPM (giro real 90,3°).
 - **Diagnóstico:** `g_yawOdom` (odometria com sinal), `diverg` (IMU × encoders, alerta acumulado > 30°) e `gyroBias` com **autoteste no boot** (limiar de ruído 0,25 °/s).
 - **Comandos de bancada:** `reta` (`t`) e `pivô` (`g`), com botões `📏 Reta 500` e `🔄 Pivô 90` no dashboard.
-- **Dashboard:** o rastro do mapa usa o **rumo real**; o CSV exportado ganha `yawReal` e `inercia`.
+- **Dashboard:** o rastro do mapa usa o **rumo real**; o CSV exportado do dashboard ganha `yawReal` e `inercia` (o dump do gravador, o logger WS e o gateway não têm essas colunas — ver a tabela de formatos no Manual).
 - **Wi-Fi:** reconexão automática no `loop()` (antes `g_wifiOk` era setado uma única vez no `setup()`).
 - **Gravador:** 1984 → **1700** amostras (40 bytes) por limite de DRAM.
 

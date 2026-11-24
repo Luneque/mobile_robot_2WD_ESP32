@@ -183,7 +183,30 @@ teste que revelou o `snprintf` 17×16.
 
 ## 3. Divergências entre Código e Documentação
 
-### 3.1 [MÉDIA] Comandos seriais documentados não funcionam
+**Verificação em 24/11/2026 (commit `51f21f9`).** Todos os itens desta seção foram
+re-verificados contra o código e a documentação vigentes:
+
+- **3.1** o Manual passa a descrever apenas `s`/`S`, `g`/`G`, Enter e `d` na serial, e deixa
+  explícito que `t`/`p`/`x`/`r` existem só por WebSocket/ESP-NOW.
+- **3.2** resolvido antes pelo item 2.1: o dashboard tem o botão **⏹ STOP** desde 23/11/2026.
+- **3.3** o Manual passa a apontar `gateway_espnow/gateway_espnow.ino` (não existe macro de
+  canal no `config.h` do robô).
+- **3.4** o Roteiro do ESP-NOW passa a dizer que a ponte **imprime** as linhas `REC,` e que
+  o CSV gravado contém apenas a telemetria ao vivo.
+- **3.5** a ambiguidade foi resolvida com a tabela de formatos (Manual, seção 5.3) e com a
+  menção explícita de que as colunas extras são do CSV do dashboard.
+- **3.6** contagens corrigidas: **16 + 17 + 9** verificações nativas e **18** Python,
+  conferidas executando `tests/native/rodar.py` e `python -m unittest`.
+- **3.7** comentários corrigidos (`firmware_robo2wd_v4.ino`, JS do dashboard): a taxa real é
+  20 Hz em movimento / 2 Hz parado e a janela é ~3,75 s.
+- **3.8** a diferença entre os formatos (16 / 17 / 19 colunas) está documentada formalmente na
+  seção 5.3 do Manual, com o dump do gravador como registro de referência.
+- **3.9** literais corrigidos: fator de carga 0,75 → 0,80; limiar do pivô ~83,2° → ~84,3°;
+  canal ESP-NOW 1 → 11; `CHARTJS_GZ_LEN` agora citado como 70.813 bytes; docstring do dump já
+  lista 16 campos; comentários de `yawAbs`/`yawReal` já corretos; aceleração ~600 → ~310 mm/s²;
+  porta do gateway `COM9` → `COM18` no Manual.
+
+### 3.1 [RESOLVIDO em 24/11/2026] Comandos seriais documentados não funcionam
 
 - **Doc:** `docs/MANUAL_TECNICO.md:133` promete `s/t/g/d/p/x/r`.
 - **Código:** o `loop()` só trata `d` (`firmware_robo2wd_v4.ino:697-703`); em
@@ -192,12 +215,12 @@ teste que revelou o `snprintf` 17×16.
 - **Correção:** alinhar o Manual ao comportamento real — ou implementar
   `t/p/x/r` na serial (é o mesmo dispatch, custa pouco).
 
-### 3.2 [MÉDIA] "Parada remota pelo painel" prometida não existe
+### 3.2 [RESOLVIDO em 24/11/2026] "Parada remota pelo painel" prometida não existe
 
 - **Doc:** `docs/MANUAL_TECNICO.md:128`.
 - **Código:** ver item 2.1; o dashboard não tem botão de STOP.
 
-### 3.3 [MÉDIA] Instrução de canal ESP-NOW aponta para macro inexistente
+### 3.3 [RESOLVIDO em 24/11/2026] Instrução de canal ESP-NOW aponta para macro inexistente
 
 - **Doc:** `docs/MANUAL_TECNICO.md:158` manda ajustar `ESPNOW_CHANNEL` no
   `config.h` do robô.
@@ -206,7 +229,7 @@ teste que revelou o `snprintf` 17×16.
   `gateway_espnow/gateway_espnow.ino:44`.
 - **Correção:** trocar a instrução para o `gateway_espnow.ino`.
 
-### 3.4 [MÉDIA] Roteiro do ESP-NOW promete CSV que não é gravado
+### 3.4 [RESOLVIDO em 24/11/2026] Roteiro do ESP-NOW promete CSV que não é gravado
 
 - **Doc:** `docs/ROTEIRO_ESPNOW.md:142-143` ("o CSV gravado contém o teste
   completo").
@@ -215,7 +238,7 @@ teste que revelou o `snprintf` 17×16.
 - **Correção:** gravar as linhas `REC,` no CSV (com o cabeçalho do dump) ou
   corrigir o texto.
 
-### 3.5 [BAIXA] "CSV ganha `yawReal` e `inercia`" ambíguo
+### 3.5 [RESOLVIDO em 24/11/2026] "CSV ganha `yawReal` e `inercia`" ambíguo
 
 - **Doc:** `docs/FSD.md:171`, `docs/MANUAL_TECNICO.md:192`.
 - **Realidade:** isso vale para o CSV do **dashboard** (`wifi_telemetry.h:459`).
@@ -223,21 +246,21 @@ teste que revelou o `snprintf` 17×16.
   (`robo_ws_logger.py:135-152`) e o gateway (`gateway_espnow.py:35-40`) **não**
   têm esses campos — e são eles que ficam com o registro do teste no solo.
 
-### 3.6 [MÉDIA] Contagem de testes desatualizada no TODO
+### 3.6 [RESOLVIDO em 24/11/2026] Contagem de testes desatualizada no TODO
 
 - **Doc:** `TODO.md:74` e `:155` dizem "29 testes nativos"; `:70` diz "11
   testes" Python.
 - **Realidade:** **16 + 17 = 33** testes nativos e **15** Python (verificados
   com `tests/native/rodar.py` e `python -m unittest`).
 
-### 3.7 [BAIXA] Telemetria "5 Hz" em três lugares
+### 3.7 [RESOLVIDO em 24/11/2026] Telemetria "5 Hz" em três lugares
 
 - **Local:** `firmware_robo2wd_v4.ino:19`, `:689` e o JS do dashboard
   (`wifi_telemetry.h:170`, `WIN=75` → "15 s a 5 Hz").
 - **Realidade:** 20 Hz em movimento e 2 Hz em repouso (`config.h:148-149`).
   A janela do dashboard hoje é ~3,75 s, não 15 s.
 
-### 3.8 [MÉDIA] Três formatos de CSV divergentes
+### 3.8 [RESOLVIDO em 24/11/2026 — diferença documentada] Três formatos de CSV divergentes
 
 - **16 colunas:** dump (`telemetry_recorder.h:46-48`), replay
   (`robo_ws_logger.py:377-382`), logger WS (`:135-152`),
@@ -250,7 +273,7 @@ teste que revelou o `snprintf` 17×16.
 - **Correção:** padronizar (ou documentar formalmente a diferença e fazer o
   teste comparar de fato).
 
-### 3.9 [BAIXA] Outras divergências pontuais
+### 3.9 [RESOLVIDO em 24/11/2026] Outras divergências pontuais
 
 | Item | Doc | Realidade |
 | :--- | :--- | :--- |

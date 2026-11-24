@@ -139,8 +139,7 @@ Se as linhas `MAC:`/`DBG:` não aparecerem, o gateway precisa de um reset
 1. Inicie uma trajetória (`start`).
 2. Aguarde o término (~45 s).
 3. Envie `dump`.
-4. Esperado: a ponte imprime as linhas `REC,...` do buffer, e o CSV gravado
-   contém o teste completo.
+4. Esperado: a ponte **imprime** as linhas `REC,...` do buffer no terminal. O CSV gravado traz apenas a telemetria ao vivo (17 colunas, com `total_lados`) — as linhas do dump **não** são escritas nele. Para obter o CSV de 16 colunas do teste, capture por Wi-Fi (`capturar_dump_wifi.py`) ou por serial (`capturar_dump.py`) e converta com `robo_ws_logger.py --replay`.
 
 > O buffer é volátil: o dump precisa acontecer antes de desligar/reiniciar o robô.
 

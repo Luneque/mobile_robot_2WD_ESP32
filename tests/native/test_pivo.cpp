@@ -59,7 +59,7 @@ int main() {
 
     std::printf("\n== fixtures reais (pivos medidos no solo, 17/11/2026) ==\n");
     // Cada linha e o yaw congelado no instante do corte, com a antecipacao
-    // vigente na epoca (0.7°). Com o limiar atual (~83.2°) todos continuam
+    // vigente na epoca (0.7°). Com o limiar atual (~84,3°) todos continuam
     // acima, logo param — o que importa e' que o limiar nao esteja alto demais.
     verificar("real L1: 1969 ticks, 89.79 deg para", atingiuMetaPivo(1969, 89.79f, ALVO_PIVO, ANGULO_CURVA_GRAUS, true));
     verificar("real L2: 1973 ticks, 90.41 deg para", atingiuMetaPivo(1973, 90.41f, ALVO_PIVO, ANGULO_CURVA_GRAUS, true));

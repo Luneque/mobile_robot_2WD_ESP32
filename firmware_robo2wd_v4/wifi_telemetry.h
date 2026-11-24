@@ -73,7 +73,7 @@ struct TelemetryPacket {
     uint32_t    odomCiclos;  // quantos ciclos de controle integraram a odometria
     float       inercia;     // graus (giro da IMU depois do corte, na pausa)
     float       inerciaOdom; // graus (giro da odometria depois do corte)
-    float       yawReal;     // graus (yawAbs + inercia: o rumo real)
+    float       yawReal;     // graus (yawAbs + g_inerciaTotal: o rumo real)
     float       rpm1;        // RPM motor esquerdo
     float       rpm2;        // RPM motor direito
     int32_t     ticks1;      // ticks encoder esquerdo (valor absoluto)
@@ -184,7 +184,7 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
 // ---- Dados históricos para CSV ----
 const csvRows = [];
 
-// ---- Janela deslizante (15 s a 5 Hz = 75 amostras) ----
+// ---- Janela deslizante (75 amostras a 20 Hz = ~3,75 s) ----
 const WIN = 75;
 
 // ---- Odometria / Mapa 2D ----

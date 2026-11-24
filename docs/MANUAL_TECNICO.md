@@ -100,7 +100,7 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 
 ### 4.2 Dinâmica do Perfil Trapezoidal
 * **Reta (500 mm):**
-  * Acelera de 20 RPM até **55 RPM** nos primeiros **50 mm** ($\approx 600\text{ mm/s}^2$).
+  * Acelera de 20 RPM até **55 RPM** nos primeiros **50 mm** ($\approx 310\text{ mm/s}^2$, pela geometria da rampa: $v^2 = u^2 + 2as$ com roda de 66 mm).
   * Mantém velocidade de cruzeiro estável por **390 mm** (78% da reta).
   * Desacelera nos últimos **60 mm** para parada cravada na marca de 500 mm (10.417 ticks).
   * Tempo total por reta: **$\approx 3,7\text{ s}$** medido em solo (com feedforward por velocidade).
@@ -126,12 +126,13 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
    * **Mapa 2D da Trajetória:** Sobreposição do quadrado ideal de 500×500 mm (azul tracejado) com o rastro real do robô (verde contínuo), marcador do robô e vetor de direção atualizados em tempo real (20 Hz no movimento). O rastro é integrado com o **rumo real** (`yawReal` = corte + inércia de frenagem), e não com o rumo congelado no corte — sem isso o traçado sai torto ~5° por pivô. Inclui coordenadas instantâneas $(X, Y)$ em mm e ângulo $\theta$ em graus, além de botão para reset manual do rastro.
    * **Gráficos em Tempo Real:** RPM (Esquerda/Direita), Yaw (graus) e pulsos de PWM ($\mu\text{s}$).
 6. Posicione o robô no solo e clique no botão verde **START** para iniciar a trajetória quadrada.
-7. A qualquer momento, envie comando de parada remota pelo painel para interromper o movimento.
+7. A qualquer momento, clique em **⏹ STOP** no dashboard para interromper o movimento (o botão existe desde 23/11/2026; antes só `stop` por WebSocket/ESP-NOW).
 8. Ao término, clique em **DOWNLOAD CSV** no dashboard para salvar o registro completo dos dados da corrida.
 
 ### 5.2 Operação Local via Cabo Serial (Fallback de Bancada)
 1. Conecte o robô via USB (`COM9`) e abra o monitor serial em **115200 baud**.
-2. O robô aceita o envio de **`s`** (start), **`t`** (reta única de 500 mm), **`g`** (pivô único de 90°), **`d`** (dump), **`p`** (pause), **`x`** (stop) e **`r`** (reset) pela serial.
+2. Pela serial o robô aceita **`s`**/**`S`** (inicia o quadrado), **`g`**/**`G`** (também inicia o quadrado — o pivô único fica nos comandos `t`/`g` via WebSocket/ESP-NOW) e **`d`** (**dump** do gravador). Enter também inicia.
+   * `t` (reta única), `p` (pause), `x` (stop) e `r` (reset) existem **apenas** por WebSocket/ESP-NOW.
    * O *timeout* automático de 5 s só dispara quando o Wi-Fi **não** está conectado; com Wi-Fi ativo, o início é remoto.
 
 ### 5.3 Gravação e Leitura de Telemetria em Solo (sem cabo)
@@ -153,13 +154,24 @@ O robô grava telemetria em RAM a 20 Hz (1700 amostras, 85 s) — ideal para tes
    ```
 6. **Atenção:** o buffer é volátil — o dump deve ser feito **antes** de desligar/reiniciar o robô.
 
+#### Formatos de CSV (três esquemas, propósitos diferentes)
+
+| Origem | Colunas | Observações |
+| :--- | :--- | :--- |
+| Dump do gravador (`d`/`dump`) e *replay* (`robo_ws_logger.py --replay`) | 16 | `timestamp_ms,estado,lado,yaw_deg,yaw_abs_deg,yaw_odom_deg,diverg_deg,gyro_bias_dps,rpm_esq,rpm_dir,ticks_esq,ticks_dir,ticks_alvo,pwm_esq_us,pwm_dir_us,rpm_alvo` |
+| Logger WS (`robo_ws_logger.py`) | 16 | mesmo esquema do dump |
+| Gateway ESP-NOW (`gateway_espnow.py`) | 17 | acrescenta `total_lados` |
+| Dashboard (botão DOWNLOAD CSV) | 19 | acrescenta `totalLados`, `yawReal`, `inercia` |
+
+O **dump do gravador é o registro de referência** do teste no solo; os demais existem para acompanhamento e trazem colunas próprias.
+
 ### 5.4 Operação via ESP-NOW (Gateway ESP32)
 > **Hardware validado:** um **ESP32 clássico** (ESP-WROOM-32, fqbn `esp32:esp32:esp32`, porta `COM18`). O ESP32-S3 era o plano original, mas a placa apresentou defeito e não chegou a ser usado. O código é de placa genérica e roda em qualquer ESP32.
 1. Grave `gateway_espnow/gateway_espnow.ino` no ESP32 auxiliar e anote o MAC impresso no Serial.
-2. Ajuste `ESPNOW_CHANNEL` em `config.h` do robô para o mesmo canal do gateway.
+2. Ajuste `ESPNOW_CHANNEL` em **`gateway_espnow/gateway_espnow.ino`** — quem fixa o canal é o gateway (o robô usa o canal da interface associada; não existe mais macro de canal no `config.h` do robô).
 3. Conecte o gateway ao PC e execute a ponte:
    ```
-   python robo_monitor/gateway_espnow.py --port COM9 --csv telemetria_espnow.csv
+   python robo_monitor/gateway_espnow.py --port COM18 --csv telemetria_espnow.csv
    ```
 4. No prompt da ponte, envie `start`, `stop`, `pause`, `reset` ou `dump`. A telemetria chega em `TELEM:{json}` e é gravada em CSV.
 
@@ -232,7 +244,7 @@ confirmado no chip após a mudança ("Calibragem carregada da NVS").
 ### Dashboard
 - O rastro do mapa usa o **rumo real** (`yawReal`), com fallback para `yawAbs` em firmware antigo.
 - Alerta de divergência: limiar 5° → **30°** (a divergência acumulada é normal, ~5° por pivô).
-- CSV exportado ganha `yawReal` e `inercia`.
+- CSV exportado (dashboard) ganha `yawReal` e `inercia`. Os outros formatos — dump do gravador, logger WS e gateway ESP-NOW — não têm essas colunas; veja a seção "Formatos de CSV".
 
 ## 📄 Atualizações Recentes (13/11/2026)
 

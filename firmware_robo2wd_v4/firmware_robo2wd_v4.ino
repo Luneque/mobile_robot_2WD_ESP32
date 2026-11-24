@@ -17,7 +17,8 @@
 // Novidades V4:
 //  7. Wi-Fi Station Mode com dashboard WebSocket em tempo real (robo.local).
 //  8. Comandos de início/parada recebidos via WebSocket (sem cabo serial).
-//  9. Telemetria JSON a 5 Hz: RPM, Yaw, ticks, PWM, estado da FSM.
+//  9. Telemetria JSON adaptativa (20 Hz em movimento, 2 Hz parado), publicada
+//     por tarefa dedicada fora do laço: RPM, Yaw, ticks, PWM, estado da FSM.
 // 10. Preparado para ESP-NOW (gateway ESP32 como fallback sem Wi-Fi).
 // =========================================================================
 
