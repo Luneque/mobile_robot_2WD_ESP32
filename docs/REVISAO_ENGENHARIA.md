@@ -375,6 +375,41 @@ Verificado por varredura em todo o firmware (`firmware_robo2wd_v4/`):
 
 ## 5. Riscos de Robustez (além dos itens 2.1–2.3)
 
+**Verificação em 24/11/2026.** Três itens foram corrigidos e os demais foram
+avaliados um a um:
+
+**Corrigido**
+
+- **`_lastCmd[64]` não atômico** (`espnow_link.h`): o callback escrevia em um único
+  buffer enquanto o `loop()` lia 64 bytes. Agora há **duplo buffer** — o callback
+  publica o buffer pronto trocando um índice de um byte (atômico), e o consumidor
+  lê o buffer publicado, que só é reescrito no comando seguinte.
+- **`update(dt_sec)` sem validação** (`imu_bmi160.h`): `dt` inválido ou saturado
+  injetaria um salto de yaw. Agora zera quando `<= 0` e limita a 0,5 s.
+- **`updateSpeed()` só em `SUB_EM_MOVIMENTO`** (`encoder_reader_pcnt.h`): o RPM da
+  telemetria ficava congelado por segundos nas pausas e em AGUARDO. O laço agora
+  decai o RPM na cadência de controle quando o controle não o faz.
+- **Estado de dump compartilhado** entre WebSocket e ESP-NOW: iniciar um canal
+  cancela o outro, eliminando a intercalação de índices.
+- **`csvRows`/`trajectory` sem teto** no dashboard: limitados a 20.000 linhas e
+  5.000 pontos.
+- **`URL.createObjectURL()` nunca revogado**: o blob anterior é revogado a cada novo
+  download.
+
+**Mantido com justificativa**
+
+- `Serial.print` dentro dos callbacks ESP-NOW: os logs são curtos e raros (boot,
+  falha de envio, comando recebido); o risco de contendição existe, mas não há
+  evidência de perda.
+- `readRawGyroZ()` devolve `0.0f` em falha de I2C: com `Wire.setTimeOut(5)` a falha
+  é rápida e tratada como giro zero naquele ciclo de 20 ms; distingui-la de "parado"
+  exigiria um contador extra na telemetria, de baixo valor prático.
+- Falha parcial no `begin()` de MCPWM/PCNT não desaloca o que já foi alocado: os
+  drivers setam `_initialized` apenas ao final, então uma falha deixa o módulo fora
+  de operação sem efeitos parciais.
+- `abs(d1) < 10000` é um guard contra saturação do PCNT: mantido, pois a
+  odometria de um PCNT saturado não teria correção segura.
+
 | Local | Risco |
 | :--- | :--- |
 | `espnow_link.h:120-148` | `Serial.print` dentro dos callbacks ESP-NOW (contexto da tarefa Wi-Fi) concorre com o `loop()` no `Serial` |

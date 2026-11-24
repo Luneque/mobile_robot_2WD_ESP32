@@ -319,9 +319,28 @@ void integrarRumo(uint32_t now, float dt, bool naPausa) {
     g_odomLastT2 = s2;
 }
 
+// =========================================================================
+// RPM FORA DO CONTROLE
+// =========================================================================
+// processarControleMovimento() e' o unico ponto que chama encoders.updateSpeed().
+// Nas pausas e em AGUARDO isso nao acontece, entao o RPM da telemetria ficaria
+// congelado no ultimo valor (visivel por segundos). Aqui o RPM decai na cadencia
+// do laco, igual ao comportamento real dos motores.
+static bool     _controleAtualizouRpm = false;
+static uint32_t _ultimaAtualizacaoRpmLivre = 0;
+
+void atualizarRpmForaDeControle(uint32_t now) {
+    if (_ultimaAtualizacaoRpmLivre == 0) { _ultimaAtualizacaoRpmLivre = now; return; }
+    float dt = (now - _ultimaAtualizacaoRpmLivre) / 1000.0f;
+    if (dt < (CONTROL_LOOP_MS / 1000.0f)) return;
+    _ultimaAtualizacaoRpmLivre = now;
+    encoders.updateSpeed(dt);
+}
+
 void processarControleMovimento(uint32_t now) {
     float dt = (now - g_lastLoopTime) / 1000.0f;
     encoders.updateSpeed(dt);
+    _controleAtualizouRpm = true;   // o laço não precisa decair o RPM neste ciclo
     integrarRumo(now, dt, false);
 
     // RPM alvo instantaneo começa zerado: se o ramo de emergencia fizer return
@@ -1005,9 +1024,11 @@ void loop() {
             _dumpTruncadoAvisado = false;
             _dumpCanalEspNow = _comandoVeioPorEspNow;
             if (_dumpCanalEspNow) {
+                _dumpParaWs = false;   // os dois canais dividem o indice do dump
                 _dumpParaEspNow = true;
                 Serial.println(F("[REC] Dump remoto via ESP-NOW solicitado."));
             } else {
+                _dumpParaEspNow = false;
                 _dumpParaWs = true;
                 Serial.println(F("[REC] Dump remoto via WebSocket solicitado."));
             }
@@ -1169,4 +1190,8 @@ void loop() {
             delay(10);
             break;
     }
+
+    // Fora do SUB_EM_MOVIMENTO o controle não chama updateSpeed(); sem isto o
+    // RPM da telemetria ficaria congelado no último valor.
+    if (!_controleAtualizouRpm) atualizarRpmForaDeControle(now);
 }

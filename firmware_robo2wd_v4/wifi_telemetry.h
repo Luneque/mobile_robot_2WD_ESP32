@@ -246,6 +246,8 @@ function updateOdometry(d) {
       posX += deltaDist * Math.sin(rad);
       posY += deltaDist * Math.cos(rad);
       trajectory.push({x: posX, y: posY});
+      // Limitado: sessao longa no dashboard nao pode crescer sem teto.
+      if (trajectory.length > 5000) trajectory.splice(0, trajectory.length - 5000);
       prevTicks = curAvgTicks;
     }
   } else if (d.st === 'PIVO') {
@@ -435,10 +437,11 @@ function handle(d){
   drawMap();
   // Diagnostico: confere o rumo da IMU contra o da odometria e o bias do giroscopio
   atualizarDiag(d);
-  // CSV buffer
+  // CSV buffer (limitado: uma sessao longa no dashboard nao pode crescer sem teto)
   csvRows.push([d.ts,d.st,d.sd,d.of,d.yaw,d.yawAbs,d.yawOdom,d.diverg,d.gyroBias,
                 d.yawReal,d.inercia,
                 d.r1,d.r2,d.t1,d.t2,d.tg,d.w1,d.w2,d.rt]);
+  if (csvRows.length > 20000) csvRows.splice(0, csvRows.length - 20000);
 }
 
 // Painel de diagnostico: divergencia IMU x odometria + bias de calibragem.
@@ -478,13 +481,16 @@ function atualizarDiag(d){
 }
 
 // Download CSV
+let _urlCsvAnterior = null;   // revoga o blob anterior para nao vazar memoria
 function downloadCsv(){
   if(!csvRows.length){ alert('Sem dados ainda.'); return; }
   const hdr = 'ts,estado,lado,totalLados,yaw,yawAbs,yawOdom,diverg,gyroBias,yawReal,inercia,rpm1,rpm2,ticks1,ticks2,ticksAlvo,pwm1,pwm2,rpmAlvo\n';
   const body = csvRows.map(r=>r.join(',')).join('\n');
   const blob = new Blob([hdr+body],{type:'text/csv'});
+  if (_urlCsvAnterior) URL.revokeObjectURL(_urlCsvAnterior);
+  _urlCsvAnterior = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = _urlCsvAnterior;
   a.download = 'telemetria_'+Date.now()+'.csv';
   a.click();
 }

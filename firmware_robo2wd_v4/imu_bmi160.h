@@ -88,6 +88,9 @@ public:
     // Atualiza a integração do ângulo de Yaw (chamar periodicamente a cada 20 ms)
     void update(float dt_sec) {
         if (!_initialized) return;
+        // dt invalido ou saturado injetaria um salto de yaw. Zera e limita.
+        if (!(dt_sec > 0.0f)) dt_sec = 0.0f;
+        if (dt_sec > 0.5f) dt_sec = 0.5f;
 
         // Convencao: giro para a DIREITA (horario) = positivo (+)
         float rawGz = readRawGyroZ();

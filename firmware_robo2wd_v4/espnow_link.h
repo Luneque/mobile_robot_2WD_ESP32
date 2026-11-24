@@ -105,7 +105,9 @@ public:
     bool hasCommand() const { return _newCommand; }
     const char* getLastCommand() {
         _newCommand = false;
-        return _lastCmd;
+        // Copia do buffer publicado; o callback nunca escreve nele de novo
+        // até o comando seguinte.
+        return _cmdBuf[_cmdPronta];
     }
 
     bool isInitialized() const { return _initOk; }
@@ -115,7 +117,11 @@ private:
     uint8_t  _gatewayMac[6] = ESPNOW_GATEWAY_MAC;
     bool     _initOk = false;
     volatile bool _newCommand = false;
-    char     _lastCmd[64] = {0};
+    // Dois buffers de comando: o callback escrita em um enquanto o outro esta
+    // publicado para o loop (a leitura de 64 bytes nao seria atomica).
+    char     _cmdBuf[2][64] = {{0}, {0}};
+    uint8_t  _cmdEscrita = 0;
+    volatile uint8_t _cmdPronta = 0;
     bool     _lastSendOk = false;
 
     // Callback de recepção: o gateway envia payload de texto.
@@ -127,27 +133,32 @@ private:
         EspNowLink* self = _instance;
         if (!self || !data) return;
 
-        int n = (len < (int)sizeof(self->_lastCmd) - 1) ? len : (int)sizeof(self->_lastCmd) - 1;
+        char* cmd = self->_cmdBuf[self->_cmdEscrita];
+        int n = (len < (int)sizeof(self->_cmdBuf[0]) - 1) ? len : (int)sizeof(self->_cmdBuf[0]) - 1;
         if (n <= 0) return;
 
         // O gateway pode preencher o payload com zeros à direita: copia só até o
         // primeiro terminador.
         int copy = 0;
         while (copy < n && data[copy] != '\0') copy++;
-        memcpy(self->_lastCmd, data, copy);
-        self->_lastCmd[copy] = '\0';
+        memcpy(cmd, data, copy);
+        cmd[copy] = '\0';
 
         // Trim de espaços e quebras de linha à direita
-        int end = (int)strlen(self->_lastCmd) - 1;
-        while (end >= 0 && (self->_lastCmd[end] == ' ' || self->_lastCmd[end] == '\r' ||
-                            self->_lastCmd[end] == '\n')) {
-            self->_lastCmd[end] = '\0';
+        int end = (int)strlen(cmd) - 1;
+        while (end >= 0 && (cmd[end] == ' ' || cmd[end] == '\r' ||
+                            cmd[end] == '\n')) {
+            cmd[end] = '\0';
             end--;
         }
 
+        // Duplo buffer: publica o buffer pronto trocando o indice (um byte,
+        // atômico). Quem consome nunca le um buffer que está sendo escrito.
+        self->_cmdPronta = self->_cmdEscrita;
+        self->_cmdEscrita = (uint8_t)((self->_cmdEscrita + 1) & 1u);
         self->_newCommand = true;
         Serial.print(F("[ESPNOW] Comando recebido: "));
-        Serial.println(self->_lastCmd);
+        Serial.println(cmd);
     }
 
     // Callback de confirmação de envio. A assinatura mudou no ESP-IDF v5
