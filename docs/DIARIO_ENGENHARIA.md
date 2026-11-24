@@ -458,7 +458,7 @@ Para elevar o projeto ao nível de maturidade industrial, a Versão 3 foi implem
 * **`calib_imu_polaridade/`:** Ferramenta de validação da polaridade do eixo Z da IMU.
 * **`diag_motor_curve/`:** Utilitário de bancada que levanta a curva PWM × RPM dos motores (com Wi-Fi/WebSocket, buffer em RAM e página web), usado para decidir entre ajuste de PID e recalibração de ESC.
 * **`robo_monitor/`:** Ferramentas Python: `robo_ws_logger.py` (telemetria + `--replay` de dump para CSV), `capturar_dump.py` (dump via serial) e `capturar_dump_wifi.py` (dump via WebSocket, com reconexão), `gateway_espnow.py` (ponte serial do gateway).
-* **`tests/`:** Testes automatizados sem hardware — `tests/native/` (16 + 17 testes sobre `robo_matematica.h` e o critério de corte do pivô) e `tests/python/` (15 testes de ferramentas, cabeçalhos e do JS do dashboard). Rodados no CI.
+* **`tests/`:** Testes automatizados sem hardware — `tests/native/` (16 + 17 + 9 verificações sobre cinemática, o critério de corte do pivô e o formato do dump) e `tests/python/` (18 testes de ferramentas, cabeçalhos e do JS do dashboard). Rodados no CI.
 * **`ferramentas/`:** Geradores de assets (ex.: `gerar_chartjs_asset.py`, que publica o Chart.js gzip em PROGMEM).
 
 ## 📄 Atualizações Recentes (24/11/2026)

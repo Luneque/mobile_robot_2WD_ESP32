@@ -33,7 +33,7 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 #### 2.3 Escopo da Versão 4.0
 - **Dentro do Escopo:**
   - Trajetória quadrada de 4 lados (500 mm) e curvas pivô de 90° orientadas por IMU.
-  - Conectividade Wi-Fi Station com telemetria WebSocket assíncrona (20 Hz em movimento / 2 Hz parado).
+  - Conectividade Wi-Fi Station com telemetria WebSocket (20 Hz em movimento / 2 Hz parado), publicada por tarefa dedicada fora do laço de controle.
   - Dashboard Web embarcado em PROGMEM com gráficos em tempo real e exportação CSV.
   - Partida remota via WebSocket (botão START no navegador).
   - Compensação por feedforward proporcional à velocidade, a partir da curva PWM×RPM medida em bancada e corrigida pelo fator de carga do robô no solo (substitui o feedforward fixo de 110 µs).

@@ -102,6 +102,18 @@ Teste_car_0/
 * 📄 **[Diário de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/DIARIO_ENGENHARIA.md)**
 * 📄 **[Revisão de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/REVISAO_ENGENHARIA.md)** — auditoria de código × documentação e plano de melhorias
 
+## 📄 Atualizações Recentes (24/11/2026)
+
+### Firmware
+- **Rede fora do laço de controle:** a publicação de telemetria (WebSocket e ESP-NOW) passou a rodar em uma tarefa dedicada no core 0; o laço apenas enfileira pacotes, sem esperar o enlace. Essa era a causa da perda de trajetória — a escrita síncrona no socket TCP bloqueava ~1 s quando o peer não drenava, com os motores no último PWM.
+- **Diagnóstico de travamento:** a telemetria ganhou `lm` (maior intervalo entre iterações do laço) e `sr`/`si` (pior bloco e qual bloco). Foram esses campos que localizaram a causa.
+- **IMU BMI160:** barramento I2C de 400 kHz → **100 kHz** e `Wire.setTimeOut(5)` — o driver usa timeout padrão de 1000 ms por transação, e os motores escovados injetam EMI no barramento.
+- **Resultado no solo:** 4 quadrados consecutivos com `lm` de 11–12 ms, fechamento de **6,4–21,4 mm** e erro de rumo de até 2,2°. Um dos testes teve um buraco de 1750 ms na telemetria sem qualquer reflexo na trajetória.
+- **Precisão depende da carga da LiPo:** 4 pivôs somaram 360,96° a 8,20 V contra 356,58° a 7,46 V.
+
+### Testes
+- 16 + 17 + 9 testes nativos, 18 Python, CI verde.
+
 ## 📄 Atualizações Recentes (19/11/2026)
 
 ### Firmware
