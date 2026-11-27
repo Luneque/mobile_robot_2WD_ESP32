@@ -199,6 +199,26 @@ class TestDashboardJS(unittest.TestCase):
         html = (FIRMWARE / "wifi_telemetry.h").read_text(encoding="utf-8")
         self.assertIn('sendCmd(\'stop\')', html, "dashboard sem botao de STOP")
 
+    def test_dashboard_tem_zoom_horizontal_nos_3_graficos(self):
+        js = self._js_do_dashboard()
+        src = (FIRMWARE / "wifi_telemetry.h").read_text(encoding="utf-8")
+        # Um controle por gráfico, com zoom in/out/reset e label de janela.
+        for k in ("rpm", "yaw", "pwm"):
+            self.assertIn("id=\"zoom-" + k + "\"", src,
+                          "grafico " + k + " sem label de zoom")
+            self.assertIn("zoom('" + k + "',-1)", src,
+                          "grafico " + k + " sem botao de zoom in")
+            self.assertIn("zoom('" + k + "',1)", src,
+                          "grafico " + k + " sem botao de zoom out")
+            self.assertIn("resetZoom('" + k + "')", src,
+                          "grafico " + k + " sem botao de reset")
+        # O zoom deve atuar sobre um historico maior que a janela visivel,
+        # senao o botao "+" nao tem dados antigos para mostrar.
+        for trecho in ("const HIST = 2400", "ZOOM_STEPS", "function zoom(",
+                       "function redraw(", "for (const k in charts) zoomLabel(k)"):
+            self.assertIn(trecho, js, "logica de zoom sem " + trecho)
+        self.assertIn("pushPoint('rpm'", js, "handle() nao alimenta o zoom de RPM")
+
 
 class TestFormatStrings(unittest.TestCase):
     """Toda snprintf/printf do firmware com conversoes tem de ter o numero

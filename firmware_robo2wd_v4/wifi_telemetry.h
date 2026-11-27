@@ -133,7 +133,14 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
   /* ---- Grid de gráficos ---- */
   #charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:14px}
   .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px}
-  .card h2{font-size:.8rem;color:#8b949e;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+  .card h2{font-size:.8rem;color:#8b949e;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;
+           display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  /* ---- Controle de zoom horizontal dos gráficos ---- */
+  .zoom{margin-left:auto;display:flex;align-items:center;gap:4px;text-transform:none;letter-spacing:0}
+  .zoom button{background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:4px;
+               width:22px;height:20px;line-height:1;font-size:.8rem;cursor:pointer;padding:0}
+  .zoom button:hover{background:#30363d;color:#c9d1d9}
+  .zoom span{font-size:.68rem;color:#8b949e;min-width:96px;text-align:center}
   canvas{width:100%!important;max-height:200px}
   /* ---- Mapa de trajetória ---- */
   .map-card{max-width:440px;margin:0 auto 14px}
@@ -175,17 +182,23 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
       aguardando telemetria…
     </div>
   </div>
-  <div class="card"><h2>RPM (Esq / Dir)</h2><canvas id="cRpm"></canvas></div>
-  <div class="card"><h2>Yaw (°)</h2>        <canvas id="cYaw"></canvas></div>
-  <div class="card"><h2>PWM µs (M1 / M2)</h2><canvas id="cPwm"></canvas></div>
+  <div class="card"><h2>RPM (Esq / Dir)<span class="zoom"><button onclick="zoom('rpm',-1)" title="Menos tempo (zoom in)">−</button><span id="zoom-rpm">—</span><button onclick="zoom('rpm',1)" title="Mais tempo (zoom out)">+</button><button onclick="resetZoom('rpm')" title="Janela padrão">↺</button></span></h2><canvas id="cRpm"></canvas></div>
+  <div class="card"><h2>Yaw (°)<span class="zoom"><button onclick="zoom('yaw',-1)" title="Menos tempo (zoom in)">−</button><span id="zoom-yaw">—</span><button onclick="zoom('yaw',1)" title="Mais tempo (zoom out)">+</button><button onclick="resetZoom('yaw')" title="Janela padrão">↺</button></span></h2><canvas id="cYaw"></canvas></div>
+  <div class="card"><h2>PWM µs (M1 / M2)<span class="zoom"><button onclick="zoom('pwm',-1)" title="Menos tempo (zoom in)">−</button><span id="zoom-pwm">—</span><button onclick="zoom('pwm',1)" title="Mais tempo (zoom out)">+</button><button onclick="resetZoom('pwm')" title="Janela padrão">↺</button></span></h2><canvas id="cPwm"></canvas></div>
 </div>
 
 <script>
 // ---- Dados históricos para CSV ----
 const csvRows = [];
 
-// ---- Janela deslizante (75 amostras a 20 Hz = ~3,75 s) ----
-const WIN = 75;
+// ---- Janela deslizante com zoom horizontal ----
+// O histórico completa mantido no cliente é maior que a janela visível, para
+// que o botão "+" possa mostrar mais tempo sem depender de nova telemetria.
+// A telemetria em movimento chega a ~20 Hz: 1 amostra ≈ 50 ms.
+const HIST = 2400;                                  // ~120 s de histórico por gráfico
+const ZOOM_STEPS = [25, 50, 75, 150, 300, 600, 1200, 2400];
+const WIN_DEFAULT = 2;                              // 75 amostras ≈ 3,75 s
+const winIdx = {rpm:WIN_DEFAULT, yaw:WIN_DEFAULT, pwm:WIN_DEFAULT};
 
 // ---- Odometria / Mapa 2D ----
 const MM_PER_TICK = 0.04799656; // 66mm diametro / 4320 ticks
@@ -393,14 +406,48 @@ const charts = {
   pwm: mkChart('cPwm',[mkDs('M1','#d2a8ff'), mkDs('M2','#ffa657')])
 };
 
-function pushPoint(chart, label, ...vals){
-  chart.data.labels.push(label);
-  vals.forEach((v,i)=>chart.data.datasets[i].data.push(v));
-  if(chart.data.labels.length > WIN){
-    chart.data.labels.shift();
-    chart.data.datasets.forEach(ds=>ds.data.shift());
+// Um histórico por gráfico, independente da janela visível. Assim o zoom
+// horizontal só troca o slice mostrado — não perde amostras antigas.
+const hist = {};
+for (const k in charts) {
+  hist[k] = {labels:[], sets: charts[k].data.datasets.map(()=>[])};
+}
+
+function zoomLabel(k){
+  const n = ZOOM_STEPS[winIdx[k]];
+  const el = document.getElementById('zoom-'+k);
+  if (el) el.textContent = n + ' amostras · ' + (n/20).toFixed(1) + ' s';
+}
+
+function redraw(k){
+  const c = charts[k], h = hist[k];
+  const n = ZOOM_STEPS[winIdx[k]];
+  const ini = Math.max(0, h.labels.length - n);
+  c.data.labels = h.labels.slice(ini);
+  c.data.datasets.forEach((ds,i)=>{ ds.data = h.sets[i].slice(ini); });
+  zoomLabel(k);
+  c.update('none');
+}
+
+// dir < 0 = menos tempo (zoom in); dir > 0 = mais tempo (zoom out)
+function zoom(k, dir){
+  const ni = Math.min(ZOOM_STEPS.length - 1, Math.max(0, winIdx[k] + dir));
+  if (ni !== winIdx[k]) { winIdx[k] = ni; redraw(k); }
+}
+function resetZoom(k){
+  if (winIdx[k] !== WIN_DEFAULT) { winIdx[k] = WIN_DEFAULT; redraw(k); }
+}
+for (const k in charts) zoomLabel(k);
+
+function pushPoint(k, label, ...vals){
+  const h = hist[k];
+  h.labels.push(label);
+  vals.forEach((v,i)=>h.sets[i].push(v));
+  if (h.labels.length > HIST) {
+    h.labels.shift();
+    h.sets.forEach(s=>s.shift());
   }
-  chart.update('none');
+  redraw(k);
 }
 
 // ---- WebSocket ----
@@ -429,9 +476,9 @@ function handle(d){
   document.getElementById('segTxt').textContent = 'Lado '+d.sd+' de '+d.of;
   // Gráficos
   const t = (d.ts/1000).toFixed(1)+'s';
-  pushPoint(charts.rpm, t, d.r1, d.r2);
-  pushPoint(charts.yaw, t, d.yaw);
-  pushPoint(charts.pwm, t, d.w1, d.w2);
+  pushPoint('rpm', t, d.r1, d.r2);
+  pushPoint('yaw', t, d.yaw);
+  pushPoint('pwm', t, d.w1, d.w2);
   // Atualiza mapa 2D
   updateOdometry(d);
   drawMap();
