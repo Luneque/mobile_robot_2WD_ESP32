@@ -1,7 +1,7 @@
 # TODO — Projeto Robô 2WD (Teste_car_0)
 
-Revisão completa do estado do projeto em **19/11/2026**, após o commit `3ca004f`
-(rumo real com inércia, pivô recalibrado, diagnóstico de rumo, mapa com rumo real).
+Revisão completa do estado do projeto em **27/11/2026**, após a calibração de
+antecipação de parada (reta e pivô). Revisão anterior: 19/11/2026, commit `3ca004f`.
 
 Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qualidade/robustez · **[P3]** higiene/evolução.
 
@@ -9,20 +9,21 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 
 ## 1. Estado Atual (resumo)
 
-- **Firmware oficial:** `firmware_robo2wd_v4/` (v4.0.0). Compila: **1.130.039 bytes (86%)** flash, **120.864 bytes (36%)** RAM.
-- **Último teste em solo válido** (robô posicionado corretamente, 19/11/2026):
+- **Firmware oficial:** `firmware_robo2wd_v4/` (v4.0.0). Compila: **1.150.039 bytes (29%)** flash, **121.232 bytes (36%)** RAM.
+- **Últimos testes em solo válidos** (27/11/2026, bateria ~7,7–8,0 V):
 
   | Métrica | Valor | Alvo |
   | :--- | :---: | :---: |
-  | Fechamento do quadrado | **7,8–8,7 mm** | 0 |
-  | Lados (pelos ticks) | 503–504 mm | 500 |
-  | Pivôs (rumo real) | 88,2–90,7° (média ≈ 89,7°) | 90,0° |
-  | Erro de direção final | −1,3° a −2,4° | 0° |
-  | Divergência IMU × odometria | ~5° por pivô (acumulada ~20°) | — |
+  | Reta isolada (com `RETA_ANTECIPACAO_MM = 20`) | 499,5–504,2 mm | 500 mm |
+  | Pivôs 90° consecutivos (4) | 90,11–91,25° (média 90,77°) | 90,0° |
+  | Quadrado — lados | 496,5 mm / 499,6 mm (2 rodadas) | 500 mm |
+  | Quadrado — pivôs | 89,75° / 90,56° | 90,0° |
+  | Fechamento do quadrado | **2,8–17,6 mm** (varia com o bias do giro no boot) | 0 |
 
-- **Working tree:** limpo.
-- **Branch:** `main` sincronizado com `origin/main` até `864c6d9`.
-- **Testes:** 16 + 17 + 9 testes nativos (`test_cinematica.cpp`, `test_pivo.cpp`, `test_recorder.cpp`) e 18 Python, CI verde.
+- **Constantes vigentes (27/11):** `RETA_ANTECIPACAO_MM = 20`, `VELOCIDADE_GIRO_RPM = 20`, `VELOCIDADE_MIN_PIVO_RPM = 12`, `PIVO_ANTECIPACAO_GRAUS = 5,7`, `VELOCIDADE_MIN_RPM = 20` (retas), `VELOCIDADE_CRUZEIRO_RPM = 55`, `CURVA_FATOR_CARGA = 0.80`.
+- **Working tree:** alterações de calibração e documentação prontas para commit (27/11).
+- **Branch:** `main`.
+- **Testes:** 16 + 17 testes nativos (`test_cinematica.cpp`, `test_pivo.cpp`, `test_recorder.cpp`) e 18 Python, todos verdes.
 
 ---
 
@@ -104,7 +105,7 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
 12. ~~**Manual Técnico não documenta o gravador em RAM nem as ferramentas de dump.**~~ **ATENDIDO (19/11/2026)** — seção 5.3 (gravação em solo sem cabo), 5.4 (ESP-NOW) e a lista de comandos seriais (`s`/`t`/`g`/`d`/`p`/`x`/`r`) documentadas; os valores de 35 RPM, 0,7° e 2000 amostras foram corrigidos para **25 RPM, 5,7° e 1700 amostras**.
 
 13. **Diário com referências antigas a 89,5°.**
-    - Etapas 9–11 citam "corte em 89,5°"; as etapas 20–24 citam 89,3° com `PIVO_ANTECIPACAO_GRAUS = 0,7°`; **o valor vigente é corte em ~84° com antecipação de 5,7°** (Etapa 25).
+    - Etapas 9–11 citam "corte em 89,5°"; as etapas 20–24 citam 89,3° com `PIVO_ANTECIPACAO_GRAUS = 0,7°`; **o valor vigente é corte em ~85° com antecipação de 5,7°** (Etapa 25; medido em 27/11 com `VELOCIDADE_GIRO_RPM = 20`).
     - Como é um registro cronológico, é intencional — mas o TODO e o FSD passam a apontar o valor atual.
 
 14. **`diag_motor_curve/secrets.h` existe no disco e está ignorado pelo `.gitignore`.**

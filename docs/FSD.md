@@ -97,7 +97,8 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 - O driver `imu_bmi160.h` fornece leitura de ângulo de guinada (yaw) e calibração de polaridade.
 - **Lógica de controle por delta real de yaw:** A cada início de segmento (reta ou curva), o firmware captura `g_yawStartSeg = imu.getYawAngleDeg()` e avalia o delta efetivamente girado (`deltaYaw = yawAtual − g_yawStartSeg`), com sinal preservado (horário = positivo). Isso elimina o disparo prematuro por resíduo de yaw da pausa anterior.
   - **Retas:** `sync_corr += deltaYaw * IMU_KP_YAW_RETA` — corrige desvio lateral aplicando diferencial de velocidade entre as rodas.
-  - **Curvas (pivô):** a IMU atua pelo critério de parada (`|deltaYaw| ≥ (ânguloAlvo − PIVO_ANTECIPACAO_GRAUS)`, corte em ~84° com antecipação de 5,7°) com guarda mínima de 200 ticks (`MIN_TICKS_PIVO`), garantindo a parada em ~90,0°; o sincronismo cruzado segue apenas pelos encoders.
+  - **Curvas (pivô):** a IMU atua pelo critério de parada (`|deltaYaw| ≥ (ânguloAlvo − PIVO_ANTECIPACAO_GRAUS)`, corte em ~85° com antecipação de 5,7°) com guarda mínima de 200 ticks (`MIN_TICKS_PIVO`), garantindo a parada em ~90°; o sincronismo cruzado segue apenas pelos encoders.
+  - **Retas (parada):** o alvo de ticks é antecipado (`RETA_ANTECIPACAO_MM = 20`) porque o robô desliza ~20 mm depois que os motores vão ao neutro; a rampa de desaceleração usa o mesmo alvo antecipado.
 - **Acelerômetro:** Inicializado pelo driver (ODR 100 Hz, faixa ±2 g), mas não lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura. Disponível para fusão sensorial futura (estimativa de inclinação ou detecção de colisão).
 
 ---
@@ -109,12 +110,14 @@ O projeto consiste no desenvolvimento e homologação do firmware embarcado para
 | **Resolução Efetiva** | `PPR_EFETIVO` | `4320.0f` | pulsos por volta completa da roda |
 | **Diâmetro da Roda** | `DIAMETRO_RODA_MM` | `66.0f` | Roda real calibrada (circunferência de ~207,35 mm) |
 | **Velocidade de Cruzeiro** | `VELOCIDADE_CRUZEIRO_RPM` | `55.0f` | $\approx 190\text{ mm/s}$ nominal; ~58 RPM real medido em solo (feedforward por velocidade) |
-| **Velocidade Mínima de Rampa** | `VELOCIDADE_MIN_RPM` | `20.0f` | Garante torque inicial sem estolar o motor |
-| **Velocidade de Curva** | `VELOCIDADE_GIRO_RPM` | `25.0f` | $\approx 1,65\text{ s}$ por giro pivô de 90°; mais lento = menos inércia de frenagem no corte |
+| **Velocidade Mínima de Rampa (Reta)** | `VELOCIDADE_MIN_RPM` | `20.0f` | Garante torque inicial sem estolar o motor nas retas |
+| **Velocidade de Curva** | `VELOCIDADE_GIRO_RPM` | `20.0f` | $\approx 1{,}9\text{ s}$ por giro pivô de 90°; mais lento = menos inércia de frenagem no corte |
+| **Piso da Rampa do Pivô** | `VELOCIDADE_MIN_PIVO_RPM` | `12.0f` | Separado da reta: permite desacelerar de 20 para ~15 RPM antes do corte (com 20/20 a rampa ficava plana) |
+| **Antecipação da Reta** | `RETA_ANTECIPACAO_MM` | `20.0f` | Alvo de 480 mm para parar nos 500 mm nominais após ~20 mm de deslizamento pós-corte |
 | **Rampa de Aceleração** | `RAMPA_ACEL_DIST_MM` | `50.0f` | Aceleração ágil ($\approx 310\text{ mm/s}^2$, por $v^2 = u^2 + 2as$) sem patinar |
-| **Rampa de Desaceleração** | `RAMPA_DESACEL_DIST_MM` | `60.0f` | Frenagem progressiva cravada na marca |
+| **Rampa de Desaceleração** | `RAMPA_DESACEL_DIST_MM` | `60.0f` | Frenagem progressiva cravada na marca (usa o alvo antecipado) |
 | **Rampa de Giro (Acel/Desacel)**| `RAMPA_CURVA_ACEL/DESACEL` | `10.0° / 15.0°` | Transição suave no pivô de 90° |
-| **Antecipação de Corte do Pivô** | `PIVO_ANTECIPACAO_GRAUS` | `5,7°` | Corte em ~84°; a inércia de frenagem (~5°) completa os 90°. Pivôs medidos em 88,2–90,7° (média ≈ 89,7°) |
+| **Antecipação de Corte do Pivô** | `PIVO_ANTECIPACAO_GRAUS` | `5,7°` | Corte em ~85°; a inércia de frenagem (~5°) completa os 90°. Pivôs medidos em 89,5–91,3° |
 | **Guarda Mínima de Giro** | `MIN_TICKS_PIVO` | `200` | Evita corte prematuro por resíduo de yaw da pausa |
 | **Ganho Proporcional** | `PID_KP_M1`, `PID_KP_M2` | `1.8f` | Resposta rápida sem sobre-oscilação |
 | **Ganho Integral** | `PID_KI_M1`, `PID_KI_M2` | `1.5f` | Zera erro em regime permanente (0,6 → 1,5 após curva PWM×RPM) |
@@ -159,7 +162,14 @@ stateDiagram-v2
 * **v1.0.0 (Legado - `legacy/firmware_robo2wd/`):** Utilizava PWM via LEDC e leitura de encoders por interrupções de software (`attachInterrupt`). Apresentava gargalo de CPU e perda de pulsos.
 * **v2.0.0 (Legado - `legacy/firmware_robo2wd_v2/`):** Migrou para MCPWM e PCNT em hardware, comprovando a redução real de 1:90 ($4.320\text{ pulsos/volta}$) e introduzindo o sincronismo cruzado. Execução em loops bloqueantes dentro do `setup()`.
 * **v3.0.0 (Legado - `legacy/firmware_robo2wd_v3/`):** Arquitetura não-bloqueante no `loop()`, perfil trapezoidal e integração inicial da IMU BMI160 com telemetria por cabo serial.
-* **v4.0.0 (OFICIAL - `firmware_robo2wd_v4/`):** Telemetria sem fio contínua via Wi-Fi/WebSocket (adaptativa: 20 Hz em movimento / 2 Hz parado), Dashboard Web embarcado em PROGMEM, comandos START/STOP remotos, feedforward proporcional à velocidade por curva PWM×RPM calibrada (fator de carga 0,80), cruzeiro alvo 55 RPM (~58 RPM real em solo) e giro pivô com **antecipação calibrada de 5,7°** (corte em ~84° + inércia ≈ 90°).
+* **v4.0.0 (OFICIAL - `firmware_robo2wd_v4/`):** Telemetria sem fio contínua via Wi-Fi/WebSocket (adaptativa: 20 Hz em movimento / 2 Hz parado), Dashboard Web embarcado em PROGMEM, comandos START/STOP remotos, feedforward proporcional à velocidade por curva PWM×RPM calibrada (fator de carga 0,80), cruzeiro alvo 55 RPM (~58 RPM real em solo), giro pivô com **antecipação calibrada de 5,7°** (corte em ~85° + inércia ≈ 90°) e **antecipação da reta de 20 mm** (alvo de 480 mm para parar nos 500 mm nominais).
+
+## 📄 Atualizações Recentes (27/11/2026)
+
+- **Antecipação da reta (`RETA_ANTECIPACAO_MM = 20`):** critério de parada e rampa de desaceleração usam `distanciaMm - 20`. A reta isolada passou de 517–522 mm para **499,5–504,2 mm** (erro +19,5 mm → +1,9 mm). Encoders contam corretamente; o excesso era inércia pós-corte, não falha de odometria.
+- **Pivô com rampa realmente descendente:** `VELOCIDADE_GIRO_RPM` 25 → **20** e novo `VELOCIDADE_MIN_PIVO_RPM = 12` (usado só por `calcularRPMTrapezoidalCurva()`; as retas mantêm `VELOCIDADE_MIN_RPM = 20`). Com 20/20 a rampa final era plana; agora o giro desacelera antes do corte e a inércia cai de ~8,5° para ~5°. `PIVO_ANTECIPACAO_GRAUS` permanece 5,7° — reduzi-lo piora o giro real.
+- **Resultado no solo:** 4 pivôs de 91,85° → **90,77°** (inércia 6,7° → 5,5°). Quadrado: 1ª rodada lados 496,5 mm / pivôs 89,75° / fechamento **2,8 mm**; 2ª rodada lados 499,6 mm / pivôs 90,56° / fechamento **17,6 mm**. Faixa real de fechamento ~3–18 mm, variando com o bias do giroscópio no boot (−0,020 a −0,010 °/s).
+- **Efeito acoplado:** reduzir o alvo da reta reduziu a energia de entrada no pivô, baixando a inércia do giro seguinte — por isso `PIVO_ANTECIPACAO_GRAUS` não precisou mudar.
 
 ## 📄 Atualizações Recentes (19/11/2026)
 

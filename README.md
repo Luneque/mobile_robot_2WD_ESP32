@@ -21,7 +21,8 @@ O sistema executa com extrema repetibilidade e controle em malha fechada uma tra
   * **Monitor e Logger Python:** Utilitário assíncrono em `robo_monitor/` para gravação e análise automatizada de corridas.
 * **Fusão Sensorial e Orientação Absoluta (IMU Bosch BMI160):**
   * Correção giroscópica contínua em retas (`IMU_KP_YAW_RETA = 2.0`) reduzindo o desvio angular para menos de 1°.
-  * Parada de pivô por delta de Yaw com **antecipação calibrada**: `PIVO_ANTECIPACAO_GRAUS = 5.7°` e `VELOCIDADE_GIRO_RPM = 25`. O corte ocorre em ~84° e a **inércia de frenagem** (~5°) completa os ~90° — sem derrapagem nem overshoot.
+  * Parada de pivô por delta de Yaw com **antecipação calibrada**: `PIVO_ANTECIPACAO_GRAUS = 5.7°`, `VELOCIDADE_GIRO_RPM = 20` e piso de rampa exclusivo `VELOCIDADE_MIN_PIVO_RPM = 12`. O corte ocorre em ~85° e a **inércia de frenagem** (~5°) completa os ~90° — sem derrapagem nem overshoot.
+  * **Antecipação da reta** (`RETA_ANTECIPACAO_MM = 20`): o alvo de ticks é 480 mm (em vez de 500) para compensar os ~20 mm de deslizamento pós-corte. A rampa de desaceleração usa o mesmo alvo antecipado, então o robô já chega ao corte devagar — o que também reduziu a inércia dos pivôs seguintes. Resultado em solo: lados de ~500 mm e quadrado fechando em 3–18 mm.
 * **Diagnóstico de Rumo e Odometria:**
   * Rumo por odometria (`g_yawOdom`), divergência IMU × encoders (`diverg`) e **autoteste de bias do giroscópio no boot**.
   * Telemetria com `yawReal` (corte + inércia), `inercia` e `inerciaOdom`.
@@ -101,6 +102,22 @@ Teste_car_0/
 * 📄 **[Roteiro de Validação do Enlace ESP-NOW](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/ROTEIRO_ESPNOW.md)**
 * 📄 **[Diário de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/DIARIO_ENGENHARIA.md)**
 * 📄 **[Revisão de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/REVISAO_ENGENHARIA.md)** — auditoria de código × documentação e plano de melhorias
+
+## 📄 Atualizações Recentes (27/11/2026)
+
+### Firmware
+- **Antecipação da reta (`RETA_ANTECIPACAO_MM = 20`):** `iniciarMovimentoReta()` agora calcula o alvo de ticks com `distanciaMm - 20`, e a rampa trapezoidal usa esse mesmo alvo. O robô corta os motores antes do nominal e desliza ~20 mm até parar — antes parava em 517–522 mm; agora em ~500 mm. Espelha `PIVO_ANTECIPACAO_GRAUS`, mas em distância. O erro não é de odometria: os encoders contam corretamente, é inércia pós-corte.
+- **Pivô com inércia menor:** `VELOCIDADE_GIRO_RPM` 25 → **20** e novo `VELOCIDADE_MIN_PIVO_RPM = 12` (piso da rampa do pivô, separado de `VELOCIDADE_MIN_RPM = 20` das retas). Antes, com `GIRO = MIN = 20`, a rampa final ficou plana e o robô não desacelerava antes do corte; com piso 12 a rampa desacelera de 20 para ~15 RPM, reduzindo a inércia de ~8,5° para ~5°. `calcularRPMTrapezoidalCurva()` usa a nova constante; as retas seguem com `VELOCIDADE_MIN_RPM = 20`.
+- **`PIVO_ANTECIPACAO_GRAUS` mantido em 5,7°:** o próprio `config.h` documenta que reduzir a antecipação piora (0,7° → giro real ~95°). A alavanca correta era a velocidade/rampa, não a antecipação.
+
+### Resultados no solo
+- **Reta isolada:** 517,5/521,6 mm → **499,5/504,2 mm** (erro médio +19,5 mm → +1,9 mm).
+- **4 pivôs 90° consecutivos:** inércia ~6,7° → ~5,5°, giro real 91,85° → **90,77°**.
+- **Quadrado:** lados de **496,5 mm** e pivôs de **89,75°** (soma 359°) com fechamento de **2,8 mm**; segunda rodada: lados **499,6 mm**, pivôs **90,56°**, fechamento **17,6 mm**. Faixa real de fechamento ~3–18 mm (variação de calibração do giroscópio no boot: bias −0,020 a −0,010 °/s).
+- **Efeito colateral positivo:** reduzir o alvo da reta diminui a energia que o robô leva para o pivô seguinte — os pivôs caíram de 91,8° para 89,75° sem mexer na antecipação.
+
+### Testes
+- 16 + 17 testes nativos, 18 Python, todos verdes; compilação e upload verificados.
 
 ## 📄 Atualizações Recentes (24/11/2026)
 

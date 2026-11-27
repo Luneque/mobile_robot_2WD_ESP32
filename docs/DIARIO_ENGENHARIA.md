@@ -499,6 +499,15 @@ Medição em bancada/solo com 4 pivôs: a **8,20 V** o giro real médio foi **90
 - `TestFormatStrings` — audita todas as chamadas `snprintf`/`printf` do firmware contra o número de argumentos (15 chamadas, 0 divergências). Foi este teste que revelou o bug do `snprintf`.
 - `test_stop_via_ws_seta_a_flag` e `test_dashboard_tem_botao_de_stop`.
 
+## 📄 Atualizações Recentes (27/11/2026)
+
+- **Diagnóstico da reta:** a reta isolada media 517–522 mm com alvo de 10.417 ticks (500 mm). O critério `atingiuMetaReta` cortava no alvo, mas o robô deslizava ~400 ticks (~20 mm) com os motores no neutro. Os encoders contavam corretamente — era inércia pós-corte, não erro de odometria.
+- **Antecipação da reta (`RETA_ANTECIPACAO_MM = 20`):** `iniciarMovimentoReta()` passou a usar `distanciaMm - 20` como alvo de ticks e a rampa de desaceleração adotou o mesmo alvo. Reta isolada: 499,5/504,2 mm (erro +1,9 mm, antes +19,5 mm).
+- **Pivô — alavanca certa:** `VELOCIDADE_GIRO_RPM` 25 → 20 mais `VELOCIDADE_MIN_PIVO_RPM = 12` (piso da rampa do pivô, separado do `VELOCIDADE_MIN_RPM = 20` das retas). Com 20/20 a rampa final ficou plana e não desacelerava. Reduzir `PIVO_ANTECIPACAO_GRAUS` foi descartado: o próprio `config.h` documenta que 0,7° resulta em giro real ~95°.
+- **Resultado:** 4 pivôs de 91,85° → 90,77° (inércia 6,7° → 5,5°). Quadrado: 1ª rodada lados 496,5 mm / pivôs 89,75° / fechamento 2,8 mm; 2ª rodada lados 499,6 mm / pivôs 90,56° / fechamento 17,6 mm. A variação de fechamento acompanha o bias do giroscópio no boot (−0,020 a −0,010 °/s).
+- **Efeito acoplado:** reduzir o alvo da reta reduziu a energia de entrada no pivô seguinte, cortando a inércia do giro — por isso a antecipação do pivô não precisou mudar.
+- **Documentação:** README, FSD, Manual Técnico, Diário e TODO atualizados; lições registradas no skill `esp32-robot-bringup`.
+
 ## 📄 Atualizações Recentes (19/11/2026)
 
 - **`yawReal` (rumo real):** `g_yawAbs + g_inerciaTotal` — cortes + inércia de **todos** os pivôs (Etapa 25).

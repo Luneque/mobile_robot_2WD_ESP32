@@ -18,7 +18,8 @@ A versão oficial do firmware (**Versão 4**) opera com:
 * **Gateway ESP-NOW:** Suporte a um microcontrolador auxiliar ESP32 para transmissão de telemetria sem necessidade de ponto de acesso Wi-Fi.
 * **Periféricos de Silício Dedicados:** **MCPWM** (50 Hz / resolução de $1\,\mu\text{s}$) e **PCNT** (decodificação de quadratura 4x por hardware com filtro anti-glitch de 1000 ns).
 * **Compensação Dinâmica de Zona Morta:** Feedforward proporcional à velocidade, derivado da curva PWM×RPM medida em bancada e corrigido pelo fator de carga do robô no solo (`CURVA_FATOR_CARGA = 0.80`), vencendo o atrito estático já na partida.
-* **Fusão Sensorial com IMU BMI160:** Correção contínua de rumo em linha reta (`IMU_KP_YAW_RETA = 2.0`) e controle estrito de parada de giro pivô por delta de yaw (corte em ~84° com antecipação de 5,7°).
+* **Fusão Sensorial com IMU BMI160:** Correção contínua de rumo em linha reta (`IMU_KP_YAW_RETA = 2.0`) e controle estrito de parada de giro pivô por delta de yaw (corte em ~85° com antecipação de 5,7°, `VELOCIDADE_GIRO_RPM = 20` e piso de rampa `VELOCIDADE_MIN_PIVO_RPM = 12`).
+* **Antecipação de parada:** tanto retas quanto pivôs cortam antes do alvo para acomodar a inércia de frenagem — `RETA_ANTECIPACAO_MM = 20` (alvo de 480 mm para parar em 500) e `PIVO_ANTECIPACAO_GRAUS = 5,7°`. A rampa de desaceleração de cada segmento usa o alvo antecipado.
 
 ---
 
@@ -90,7 +91,7 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 ### 4.1 Módulos do Sistema
 * **[`config.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/config.h):** Centraliza pinos, limites de pulso do ESC ($1150\,\mu\text{s}$ a $1850\,\mu\text{s}$), parâmetros cinemáticos (roda de 66 mm), distâncias de rampa, parâmetros do WDT e ganhos de fusão com a IMU (`IMU_KP_YAW_RETA = 2.0`) e sincronismo cruzado (`K_SYNC = 0.15`).
 * **[`wifi_telemetry.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/wifi_telemetry.h):** Driver de conectividade Wi-Fi Station, servidor WebSocket (porta 81) e servidor HTTP (porta 80). Contém o Dashboard Web embarcado em PROGMEM com gráficos Chart.js e visualizador 2D da trajetória em tempo real (HTML5 Canvas).
-* **[`imu_bmi160.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/imu_bmi160.h):** Driver nativo I2C (100 kHz — mais tolerante a EMI dos motores que 400 kHz; o driver usa `Wire.setTimeOut(5)` para uma transação perdida não travar o laço) para a IMU Bosch BMI160. Fornece calibração estática de *bias* do giroscópio, leitura direta do eixo Z (giro horário = Yaw positivo) e integração de ângulo de guinada (*Yaw*). O firmware usa o delta real de yaw (`deltaYaw = yawAtual − g_yawStartSeg`, capturado no início de cada segmento) para correção de rumo em retas (`IMU_KP_YAW_RETA = 2.0`). No pivô, a IMU atua pelo critério de parada (`|deltaYaw| ≥ (ânguloAlvo − PIVO_ANTECIPACAO_GRAUS)`, corte em ~84° com antecipação calibrada de 5,7°) com guarda mínima de 200 ticks (`MIN_TICKS_PIVO`) para evitar disparos prematuros por resíduo de yaw; o sincronismo cruzado é feito apenas pelos encoders. O acelerômetro é inicializado pelo driver (ODR 100 Hz, ±2 g), mas não é lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura.
+* **[`imu_bmi160.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/imu_bmi160.h):** Driver nativo I2C (100 kHz — mais tolerante a EMI dos motores que 400 kHz; o driver usa `Wire.setTimeOut(5)` para uma transação perdida não travar o laço) para a IMU Bosch BMI160. Fornece calibração estática de *bias* do giroscópio, leitura direta do eixo Z (giro horário = Yaw positivo) e integração de ângulo de guinada (*Yaw*). O firmware usa o delta real de yaw (`deltaYaw = yawAtual − g_yawStartSeg`, capturado no início de cada segmento) para correção de rumo em retas (`IMU_KP_YAW_RETA = 2.0`). No pivô, a IMU atua pelo critério de parada (`|deltaYaw| ≥ (ânguloAlvo − PIVO_ANTECIPACAO_GRAUS)`, corte em ~85° com antecipação calibrada de 5,7°) com guarda mínima de 200 ticks (`MIN_TICKS_PIVO`) para evitar disparos prematuros por resíduo de yaw; o sincronismo cruzado é feito apenas pelos encoders. O acelerômetro é inicializado pelo driver (ODR 100 Hz, ±2 g), mas não é lido pelo firmware — apenas o utilitário `diag_i2c_bmi160` faz a leitura.
 * **[`motor_control_mcpwm.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/motor_control_mcpwm.h):** Gerador determinístico de PWM a 50 Hz com resolução de $1\,\mu\text{s}$ via timer de 1 MHz.
 * **[`encoder_reader_pcnt.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/encoder_reader_pcnt.h):** Decodificador de pulsos com filtro anti-glitch de 1000 ns e filtro exponencial de velocidade (EMA).
 * **[`pid_controller.h`](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/firmware_robo2wd_v4/pid_controller.h):** Controlador PID com anti-windup e feedforward proporcional à velocidade, obtido por interpolação da curva PWM×RPM medida em bancada (`diag_motor_curve`) e corrigido pelo fator de carga (`CURVA_FATOR_CARGA`).
@@ -99,15 +100,15 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
 * **`firmware_robo2wd_v4.ino`:** Máquina de estados não-bloqueante (`ESTADO_AGUARDO_INICIO`, `ESTADO_EXECUTANDO_TRAJETORIA`, `ESTADO_CONCLUIDO`, `ESTADO_EMERGENCIA`), perfil trapezoidal, fusão sensorial IMU + Encoders e dispatch centralizado de comandos.
 
 ### 4.2 Dinâmica do Perfil Trapezoidal
-* **Reta (500 mm):**
+* **Reta (500 mm nominais):**
   * Acelera de 20 RPM até **55 RPM** nos primeiros **50 mm** ($\approx 310\text{ mm/s}^2$, pela geometria da rampa: $v^2 = u^2 + 2as$ com roda de 66 mm).
-  * Mantém velocidade de cruzeiro estável por **390 mm** (78% da reta).
-  * Desacelera nos últimos **60 mm** para parada cravada na marca de 500 mm (10.417 ticks).
-  * Tempo total por reta: **$\approx 3,7\text{ s}$** medido em solo (com feedforward por velocidade).
+  * Mantém velocidade de cruzeiro estável pela maior parte da reta.
+  * O alvo de ticks é **antecipado em 20 mm** (`RETA_ANTECIPACAO_MM = 20`): a rampa de desaceleração começa nos últimos 60 mm em relação ao alvo de 480 mm (10.000 ticks). O robô corta antes e desliza ~20 mm até parar nos **500 mm nominais**.
+  * Tempo total por reta: **$\approx 3{,}0\text{ s}$** medido em solo (reta isolada, 499,5–504,2 mm).
 * **Curva Pivô (90°):**
-  * Acelera em 10° e desacelera em 15°, com cruzeiro suavizado de **25 RPM** no giro pivô.
-  * Corte em ~84° com **antecipação calibrada de 5,7°** (`PIVO_ANTECIPACAO_GRAUS`); a **inércia de frenagem** (~5°) completa os ~90°.
-  * Tempo total por giro: **$\approx 1,65\text{ s}$** de movimento + 0,8 s de pausa = **$\approx 2,45\text{ s}$** (medido em solo).
+  * Acelera em 10° e desacelera em 15°, com cruzeiro suavizado de **20 RPM** no giro pivô (`VELOCIDADE_GIRO_RPM`). O piso da rampa é `VELOCIDADE_MIN_PIVO_RPM = 12`, separado das retas — com 20/20 a rampa final era plana e o robô não desacelerava antes do corte.
+  * Corte em ~85° com **antecipação calibrada de 5,7°** (`PIVO_ANTECIPACAO_GRAUS`); a **inércia de frenagem** (~5°) completa os ~90°.
+  * Tempo total por giro: **$\approx 1{,}9\text{ s}$** de movimento + 0,8 s de pausa = **$\approx 2{,}7\text{ s}$** (medido em solo).
 
 ---
 
@@ -229,6 +230,20 @@ arduino-cli compile --fqbn esp32:esp32:esp32 \
 confirmado no chip após a mudança ("Calibragem carregada da NVS").
 
 ---
+
+## 📄 Atualizações Recentes (27/11/2026)
+
+### Firmware
+- **Antecipação da reta (`RETA_ANTECIPACAO_MM = 20`):** `iniciarMovimentoReta()` calcula o alvo de ticks com `distanciaMm - 20` e a rampa de desaceleração usa o mesmo alvo. A reta isolada passou de 517–522 mm para **499,5–504,2 mm** (erro médio +19,5 mm → +1,9 mm). O encoder conta certo — o excesso era inércia pós-corte.
+- **Pivô:** `VELOCIDADE_GIRO_RPM` 25 → **20** e novo `VELOCIDADE_MIN_PIVO_RPM = 12`, usado por `calcularRPMTrapezoidalCurva()` (as retas mantêm `VELOCIDADE_MIN_RPM = 20`). Com 20/20 a rampa era plana; agora há desaceleração real antes do corte. `PIVO_ANTECIPACAO_GRAUS` fica em 5,7° — reduzi-lo piora o giro real.
+- **`config.h`:** antecipação da reta e piso do pivô documentados com as medições que os originaram.
+
+### Resultados no solo
+- Reta isolada: 499,5/504,2 mm; 4 pivôs: giro real 90,77° (inércia 5,5°).
+- Quadrado (2 rodadas): lados 496,5 mm e 499,6 mm; pivôs 89,75° e 90,56°; fechamento **2,8 mm** e **17,6 mm**. Variação atribuída ao bias do giroscópio no boot (−0,020 a −0,010 °/s).
+
+### Testes
+- 16 + 17 testes nativos, 18 Python, todos verdes; compilação/upload OK.
 
 ## 📄 Atualizações Recentes (19/11/2026)
 

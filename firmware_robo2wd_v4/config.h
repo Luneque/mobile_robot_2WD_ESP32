@@ -137,11 +137,27 @@
 // quando as ticks atingem este fator do alvo (evita giro infinito).
 #define PIVO_FALLBACK_FATOR    1.15f
 
+// Antecipacao do corte da reta (mm): o criterio de parada e' por ticks, mas o
+// robo continua deslizando depois de os motores irem ao neutro. Medido no solo
+// em 27/11 (reta isolada, alvo 10417 ticks): corte aos 10474 ticks e parada
+// final aos ~10824 ticks -> ~19,5 mm de inercia pos-corte.
+// Antecipar o alvo (e a rampa de desaceleracao junto) faz o robo parar nos
+// 500 mm nominais. Espelha PIVO_ANTECIPACAO_GRAUS, mas em distancia.
+#define RETA_ANTECIPACAO_MM   20.0f
+
 #define VELOCIDADE_CRUZEIRO_RPM 55.0f // Alvo do controlador. Medido no solo: ~60 RPM pico (bateria 2S), ~190 mm/s
 #define VELOCIDADE_MIN_RPM      20.0f // Velocidade mínima de rampa (para não estolar)
-// Velocidade alvo do pivô. Reduzida de 35 para 25 RPM: a inércia de frenagem
-// cresce com a velocidade, e era ela que fazia o giro passar de 90°.
-#define VELOCIDADE_GIRO_RPM     25.0f
+// Velocidade alvo do pivô. Reduzida de 35 para 25 RPM em 24/11 e para 20 RPM
+// em 27/11: a inercia de frenagem e' o residuo sistematico do giro. Com 25 RPM
+// a inercia medida no solo era ~8,5 graus (giro real ~94 graus); a 20 RPM a
+// inercia caiu para ~6,7 graus (giro real ~92 graus).
+// Antecipar mais piora (6,8° -> inercia 9° -> real 93°); a alavanca e' velocidade.
+#define VELOCIDADE_GIRO_RPM     20.0f
+// Piso da rampa do pivô, separado da reta para nao alterar o comportamento
+// validado das retas. Com GIRO=20 e MIN=20 a rampa final ficou plana (sem
+// desaceleracao antes do corte), deixando 6,7° de inercia. Com MIN=12 a rampa
+// desacelera de 20 para ~15 RPM no corte, reduzindo a inercia para ~5°.
+#define VELOCIDADE_MIN_PIVO_RPM 12.0f
 #define PAUSA_ENTRE_MOVIMENTOS_MS 800 // Pausa de estabilização entre movimentos
 
 // Distâncias de aceleração e desaceleração para perfil trapezoidal (em mm)

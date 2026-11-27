@@ -194,7 +194,7 @@ float calcularRPMTrapezoidalReta(int32_t currentTicks, int32_t targetTicks) {
 }
 
 float calcularRPMTrapezoidalCurva(int32_t currentTicks, int32_t targetTicks) {
-    if (targetTicks <= 0) return VELOCIDADE_MIN_RPM;
+    if (targetTicks <= 0) return VELOCIDADE_MIN_PIVO_RPM;
 
     float arcoPercorridoMm = currentTicks * MM_POR_PULSO;
     float grausPercorridos = (arcoPercorridoMm / (PI * DIST_RODAS_MM)) * 360.0f;
@@ -204,14 +204,14 @@ float calcularRPMTrapezoidalCurva(int32_t currentTicks, int32_t targetTicks) {
 
     if (grausPercorridos < RAMPA_CURVA_ACEL_GRAUS) {
         float fator = grausPercorridos / RAMPA_CURVA_ACEL_GRAUS;
-        rpmAlvo = VELOCIDADE_MIN_RPM + (VELOCIDADE_GIRO_RPM - VELOCIDADE_MIN_RPM) * fator;
+        rpmAlvo = VELOCIDADE_MIN_PIVO_RPM + (VELOCIDADE_GIRO_RPM - VELOCIDADE_MIN_PIVO_RPM) * fator;
     } else if (grausRestantes < RAMPA_CURVA_DESACEL_GRAUS) {
         float fator = grausRestantes / RAMPA_CURVA_DESACEL_GRAUS;
         if (fator < 0.0f) fator = 0.0f;
-        rpmAlvo = VELOCIDADE_MIN_RPM + (VELOCIDADE_GIRO_RPM - VELOCIDADE_MIN_RPM) * fator;
+        rpmAlvo = VELOCIDADE_MIN_PIVO_RPM + (VELOCIDADE_GIRO_RPM - VELOCIDADE_MIN_PIVO_RPM) * fator;
     }
 
-    if (rpmAlvo < VELOCIDADE_MIN_RPM) rpmAlvo = VELOCIDADE_MIN_RPM;
+    if (rpmAlvo < VELOCIDADE_MIN_PIVO_RPM) rpmAlvo = VELOCIDADE_MIN_PIVO_RPM;
     return rpmAlvo;
 }
 
@@ -220,7 +220,9 @@ float calcularRPMTrapezoidalCurva(int32_t currentTicks, int32_t targetTicks) {
 // =========================================================================
 
 void iniciarMovimentoReta(float distanciaMm) {
-    g_targetTicks = ticksParaMm(distanciaMm);
+    // O alvo de ticks inclui a antecipacao: o robo desliza ~20 mm depois do
+    // corte, entao paramos antes para a posicao final bater na distancia nominal.
+    g_targetTicks = ticksParaMm(distanciaMm - RETA_ANTECIPACAO_MM);
     g_emLinhaReta = true;
     encoders.reset();
     pid1.reset();
