@@ -18,8 +18,8 @@ A versão oficial do firmware (**Versão 4**) opera com:
 * **Gateway ESP-NOW:** Suporte a um microcontrolador auxiliar ESP32 para transmissão de telemetria sem necessidade de ponto de acesso Wi-Fi.
 * **Periféricos de Silício Dedicados:** **MCPWM** (50 Hz / resolução de $1\,\mu\text{s}$) e **PCNT** (decodificação de quadratura 4x por hardware com filtro anti-glitch de 1000 ns).
 * **Compensação Dinâmica de Zona Morta:** Feedforward proporcional à velocidade, derivado da curva PWM×RPM medida em bancada e corrigido pelo fator de carga do robô no solo (`CURVA_FATOR_CARGA = 0.80`), vencendo o atrito estático já na partida.
-* **Fusão Sensorial com IMU BMI160:** Correção contínua de rumo em linha reta (`IMU_KP_YAW_RETA = 2.0`) e controle estrito de parada de giro pivô por delta de yaw (corte em ~85° com antecipação de 5,7°, `VELOCIDADE_GIRO_RPM = 20` e piso de rampa `VELOCIDADE_MIN_PIVO_RPM = 12`).
-* **Antecipação de parada:** tanto retas quanto pivôs cortam antes do alvo para acomodar a inércia de frenagem — `RETA_ANTECIPACAO_MM = 20` (alvo de 480 mm para parar em 500) e `PIVO_ANTECIPACAO_GRAUS = 5,7°`. A rampa de desaceleração de cada segmento usa o alvo antecipado.
+* **Fusão Sensorial com IMU BMI160:** Correção contínua de rumo em linha reta (`IMU_KP_YAW_RETA = 2.0`) e controle estrito de parada de giro pivô por delta de yaw (corte em ~86° com antecipação de 3,7°, `VELOCIDADE_GIRO_RPM = 20` e piso de rampa `VELOCIDADE_MIN_PIVO_RPM = 12`).
+* **Antecipação de parada:** tanto retas quanto pivôs cortam antes do alvo para acomodar a inércia de frenagem — `RETA_ANTECIPACAO_MM = 20` (alvo de 480 mm para parar em 500) e `PIVO_ANTECIPACAO_GRAUS = 3,7°`. A rampa de desaceleração de cada segmento usa o alvo antecipado.
 
 ---
 
@@ -107,7 +107,7 @@ A estrutura oficial reside em [`firmware_robo2wd_v4/`](file:///C:/Users/luneque.
   * Tempo total por reta: **$\approx 3{,}0\text{ s}$** medido em solo (reta isolada, 499,5–504,2 mm).
 * **Curva Pivô (90°):**
   * Acelera em 10° e desacelera em 15°, com cruzeiro suavizado de **20 RPM** no giro pivô (`VELOCIDADE_GIRO_RPM`). O piso da rampa é `VELOCIDADE_MIN_PIVO_RPM = 12`, separado das retas — com 20/20 a rampa final era plana e o robô não desacelerava antes do corte.
-  * Corte em ~85° com **antecipação calibrada de 5,7°** (`PIVO_ANTECIPACAO_GRAUS`); a **inércia de frenagem** (~5°) completa os ~90°.
+  * Corte em ~86° com **antecipação de 3,7°** (`PIVO_ANTECIPACAO_GRAUS`); a inércia e o pulso de frenagem completam o giro (~92° medidos; ver seção de frenagem ativa).
   * Tempo total por giro: **$\approx 1{,}9\text{ s}$** de movimento + 0,8 s de pausa = **$\approx 2{,}7\text{ s}$** (medido em solo).
 
 ---
@@ -230,6 +230,14 @@ arduino-cli compile --fqbn esp32:esp32:esp32 \
 confirmado no chip após a mudança ("Calibragem carregada da NVS").
 
 ---
+
+## 📄 Atualizações Recentes (27/11/2026 — frenagem ativa)
+
+- **Frenagem ativa no corte:** entre o atingimento da meta e a pausa entre segmentos, o firmware aplica um pulso de 60 ms com PWM oposto ao movimento de cada roda (`FRENAGEM_PWM_US = 1400`, simétrico: 1400 ↔ 1600 µs em torno do neutro). Em retas as duas rodas recebem 1400 µs; em pivôs, uma recebe 1400 e a outra 1600, conforme `g_sentidoGiro`. O pulso elimina quase toda a inércia pós-corte (deslizamento da reta ~20 mm → ~3 mm, salto de yaw ~2° → ~0,3°). Para desativar: `FRENAGEM_ATIVA = false` em `config.h`.
+- **Constantes de parada vigentes:** `RETA_ANTECIPACAO_MM = 20`, `PIVO_ANTECIPACAO_GRAUS = 3,7°`, `VELOCIDADE_GIRO_RPM = 20`, `VELOCIDADE_MIN_PIVO_RPM = 12`, `FRENAGEM_TEMPO_MS = 60`.
+- **Gráficos do monitor:** o dashboard só acrescenta pontos durante `RETA`/`PIVO`. Amostras de repouso são ignoradas e cada novo experimento reinicia a série com tempo relativo ao início do movimento — o gráfico não "foge" para a esquerda após o robô ficar parado.
+- **Procedimento obrigatório:** após gravar firmware, **esperar o robô ser colocado no solo e confirmado pelo usuário antes de rodar qualquer teste**. Com o robô suspenso na bancada o corpo não gira e o teste não mede nada de útil (pivôs ~0° por fallback de ticks).
+- **Resultado de referência (bateria ~7,8 V):** lados 499,2 mm, pivôs 92,2°, fechamento 55,8 mm. O desvio angular residual de ~2° por pivô está sob investigação; a alavanca a testar é a rampa/velocidade do pivô.
 
 ## 📄 Atualizações Recentes (27/11/2026)
 

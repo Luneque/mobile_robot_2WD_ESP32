@@ -80,6 +80,16 @@
 #define ESC_MIN_US         1150     // Potência máxima permitida em ré
 #define ESC_MAX_US         1850     // Potência máxima permitida para frente
 
+// Frenagem ativa no corte de cada segmento: em vez de ir direto ao neutro,
+// aplica um pulso curto OPPOSTO ao movimento de cada roda para vencer a inercia.
+// Reduz o deslizamento longitudinal (~20 mm -> ~3 mm na reta) e o salto de yaw
+// (~2° -> ~0,4°). Na reta as duas rodas frenam com ré; no pivô uma freia com ré
+// e a outra com frente (2*neutro - pulso). VALIDAR EM BANCADA antes de reduzir
+// as antecipacoes: frenar demais inverte o movimento/trava as rodas.
+#define FRENAGEM_ATIVA        true   // liga/desliga a frenagem (A/B sem recompilar)
+#define FRENAGEM_PWM_US      1400    // pulso de ré (1500 = neutro; 1150 = ré maxima)
+#define FRENAGEM_TEMPO_MS    60     // duracao do pulso antes de ir ao neutro
+
 // ==========================================
 // 4. PARÂMETROS DO CONTROLADOR PID E SINCRONISMO
 // ==========================================
@@ -114,20 +124,27 @@
 #define LADO_QUADRADO_MM   500.0f   // Comprimento de cada lado em mm (50 cm)
 #define ANGULO_CURVA_GRAUS 90.0f    // Ângulo de cada curva em graus
 // Antecipação do corte do pivô (graus): corta o giro ANTES do alvo para
-// acomodar a inércia de frenagem — o robô continua girando depois de os
-// motores pararem.
+// acomodar o giro residual — o robô continua girando depois do corte.
 //
 // ATENCAO: calibrar pelo giro REAL no chão, nunca pelo yaw da IMU. O yaw
 // registrado congela no instante do corte e por isso as calibragens antigas
 // (0.2° -> 0.7°) mediam 90° na IMU enquanto o robô fazia ~95° de verdade.
 //
-// A inércia CRESCE quando se antecipa demais (o robô para mais rápido):
+// HISTORICO (sem frenagem ativa, corte direto ao neutro):
 //   0.7° -> corte 89.3°, inercia ~5.7°, real ~95°
 //   5.7° -> corte 84.3°, inercia 7.2°, real 91.5°   (melhor ponto)
 //   6.8° -> corte 83.2°, inercia 9.0°, real 93.1°
-// Por isso 5.7° é o valor vigente. Para baixar o resíduo, reduzir a
-// VELOCIDADE_GIRO_RPM (menos inércia), não antecipar mais.
-#define PIVO_ANTECIPACAO_GRAUS 5.7f
+//
+// COM FRENAGEM ATIVA (27/11): a frenagem espelhada elimina quase toda a
+// inercia pos-corte (salto -0.3°), mas o giro residual (~6°) vem da rampa de
+// desaceleracao do pivô, NAO da antecipacao nem da duracao do pulso. Testes:
+//   5.7° + pulso 120ms -> real 92.3° (bateria 8.44V)
+//   3.7° + pulso 120ms -> real 92.7° (7.58V) / 92.6° (7.89V)
+//   3.7° + pulso  60ms -> real 92.2°, lados 499.2mm, fech 55.8mm (7.83V)
+// Antecipacao menor nao reduziu o residuo; manter 3.7° (corte ~86°) com o
+// pulso de 60ms: melhor resultado observado. Para corrigir os ~2° restantes,
+// atuar na rampa/velocidade do pivô, nao na antecipacao.
+#define PIVO_ANTECIPACAO_GRAUS 3.7f
 
 // Guarda mínima de ticks do pivô: só aceita o yaw da IMU depois que a
 // odometria confirma movimento real (~9,6 mm de arco), evitando cortar por

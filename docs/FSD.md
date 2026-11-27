@@ -164,6 +164,18 @@ stateDiagram-v2
 * **v3.0.0 (Legado - `legacy/firmware_robo2wd_v3/`):** Arquitetura não-bloqueante no `loop()`, perfil trapezoidal e integração inicial da IMU BMI160 com telemetria por cabo serial.
 * **v4.0.0 (OFICIAL - `firmware_robo2wd_v4/`):** Telemetria sem fio contínua via Wi-Fi/WebSocket (adaptativa: 20 Hz em movimento / 2 Hz parado), Dashboard Web embarcado em PROGMEM, comandos START/STOP remotos, feedforward proporcional à velocidade por curva PWM×RPM calibrada (fator de carga 0,80), cruzeiro alvo 55 RPM (~58 RPM real em solo), giro pivô com **antecipação calibrada de 5,7°** (corte em ~85° + inércia ≈ 90°) e **antecipação da reta de 20 mm** (alvo de 480 mm para parar nos 500 mm nominais).
 
+## 📄 Atualizações Recentes (27/11/2026 — frenagem ativa)
+
+- **Frenagem ativa no corte de segmento:** nova funcionalidade da Versão 4. O subestado `SUB_FRENAGEM` foi inserido entre o movimento e a pausa na FSM. Ao atingir a meta (`atingiuMetaReta`/`atingiuMetaPivo`), o controlador aplica um pulso curto de PWM oposto ao movimento corrente de cada roda antes de ir ao neutro, reduzindo a inércia de parada.
+  - Constantes: `FRENAGEM_ATIVA = true`, `FRENAGEM_PWM_US = 1400`, `FRENAGEM_TEMPO_MS = 60`. `FRENAGEM_ATIVA = false` restaura o corte direto ao neutro (comportamento anterior) sem alterar a lógica.
+  - Reta: 1400/1400 µs (ré nas duas). Pivô: 1400/1600 µs ou 1600/1400 µs (`2 * ESC_NEUTRO_US - FRENAGEM_PWM_US`), espelhado conforme `g_sentidoGiro`. O espelhamento é obrigatório: pulso igual nas duas rodas acelerava a roda que já vinha em ré.
+  - A inércia é integrada durante a frenagem (`integrarRumo(..., true)`) para que o rumo real do mapa inclua o giro no pulso.
+  - Efeito medido: deslizamento da reta ~20 mm → ~3 mm; salto de yaw no corte ~2° → ~0,3°.
+- **Antecipação do pivô ajustada:** `PIVO_ANTECIPACAO_GRAUS` 5,7° → 3,7°, compatível com o corte por IMU em ~86° sob frenagem. `RETA_ANTECIPACAO_MM = 20` permanece (a frenagem reduziu o coast da reta, mas a antecipação ainda compensa o perfil trapezoidal).
+- **Resíduo angular conhecido:** pivôs fecham em ~92,2° (alvo 90°) com frenagem espelhada e pulso de 60 ms. O desvio é sistemático e independe de bateria (7,58–7,89 V), antecipação (3,7–5,7°) ou duração do pulso (60–120 ms). Atribuído à rampa de desaceleração do pivô; a alavanca correta é `VELOCIDADE_GIRO_RPM`/`VELOCIDADE_MIN_PIVO_RPM`, não a antecipação.
+- **Dashboard — filtro de telemetria ociosa:** os gráficos só aceitam amostras de `RETA`/`PIVO`. Quadros de `CONCLUIDO`/`AGUARDO` (2 Hz com o robô parado) são descartados, e a transição ocioso→ativo limpa o histórico e reinicia o relógio relativo. Isso impede que a série temporal desapareça para a esquerda após períodos sem operação, preservando a exibição de experimentos sucessivos e comandos manuais.
+- **Restrição operacional:** testes de solo jamais devem ser iniciados imediatamente após a gravação do firmware — o robô está suspenso nesse instante, o corpo não gira e o pivô cai no fallback de ticks (yaw ~0°), invalidando a medição.
+
 ## 📄 Atualizações Recentes (27/11/2026)
 
 - **Antecipação da reta (`RETA_ANTECIPACAO_MM = 20`):** critério de parada e rampa de desaceleração usam `distanciaMm - 20`. A reta isolada passou de 517–522 mm para **499,5–504,2 mm** (erro +19,5 mm → +1,9 mm). Encoders contam corretamente; o excesso era inércia pós-corte, não falha de odometria.

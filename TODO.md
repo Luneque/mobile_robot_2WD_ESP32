@@ -20,10 +20,11 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
   | Quadrado — pivôs | 89,75° / 90,56° | 90,0° |
   | Fechamento do quadrado | **2,8–17,6 mm** (varia com o bias do giro no boot) | 0 |
 
-- **Constantes vigentes (27/11):** `RETA_ANTECIPACAO_MM = 20`, `VELOCIDADE_GIRO_RPM = 20`, `VELOCIDADE_MIN_PIVO_RPM = 12`, `PIVO_ANTECIPACAO_GRAUS = 5,7`, `VELOCIDADE_MIN_RPM = 20` (retas), `VELOCIDADE_CRUZEIRO_RPM = 55`, `CURVA_FATOR_CARGA = 0.80`.
-- **Working tree:** alterações de calibração e documentação prontas para commit (27/11).
+- **Constantes vigentes (27/11, com frenagem ativa):** `RETA_ANTECIPACAO_MM = 20`, `VELOCIDADE_GIRO_RPM = 20`, `VELOCIDADE_MIN_PIVO_RPM = 12`, `PIVO_ANTECIPACAO_GRAUS = 3,7`, `FRENAGEM_ATIVA = true`, `FRENAGEM_PWM_US = 1400`, `FRENAGEM_TEMPO_MS = 60`, `VELOCIDADE_MIN_RPM = 20` (retas), `VELOCIDADE_CRUZEIRO_RPM = 55`, `CURVA_FATOR_CARGA = 0.80`.
+- **Últimos testes (27/11, frenagem espelhada + pulso 60 ms, bateria 7,83 V):** lados 499,2 mm, pivôs 92,2°, fechamento 55,8 mm; deslizamento da reta ~3 mm, salto de yaw no corte ~0,3°.
+- **Working tree:** frenagem ativa e documentação prontas para commit (27/11).
 - **Branch:** `main`.
-- **Testes:** 16 + 17 testes nativos (`test_cinematica.cpp`, `test_pivo.cpp`, `test_recorder.cpp`) e 18 Python, todos verdes.
+- **Testes:** 16 + 17 testes nativos (`test_cinematica.cpp`, `test_pivo.cpp`, `test_recorder.cpp`) e 19 Python, todos verdes.
 
 ---
 
@@ -52,6 +53,12 @@ Legenda de prioridade: **[P1]** bloqueia ou degrada a operação · **[P2]** qua
    - Relacionado ao item anterior. O ESC é escovado (bidirecional duplo) de 2-3S; operar abaixo de ~6,4 V danifica a célula.
 
 ### [P2] Robustez e qualidade
+
+0. **[P2] Resíduo angular sistemático de ~2° por pivô com frenagem ativa.**
+   - Pivôs fecham em ~92,2° (alvo 90°) com `PIVO_ANTECIPACAO_GRAUS = 3,7°` e pulso de 60 ms.
+   - O desvio é sistemático: independe da bateria (7,58 → 7,89 V), da antecipação (3,7–5,7°) e da duração do pulso (60–120 ms).
+   - A alavanca a testar é a rampa de desaceleração do pivô (`VELOCIDADE_GIRO_RPM` / `VELOCIDADE_MIN_PIVO_RPM`), não a antecipação.
+   - **Regra operacional:** nunca rodar teste de solo imediatamente após gravar firmware — o robô fica suspenso, o corpo não gira e o pivô cai no fallback de ticks (yaw ~0°). Esperar confirmação de que foi colocado no solo.
 
 4. ~~**Dashboard depende de internet (Chart.js via CDN).**~~ **ATENDIDO (17/11/2026).**
    - O Chart.js 4.5.1 (UMD min) passou a ser servido pelo próprio ESP32 em `/chartjs.min.js`; o dashboard não depende mais de CDN nem de upstream do AP.

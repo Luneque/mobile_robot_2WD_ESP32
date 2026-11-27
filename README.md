@@ -103,6 +103,31 @@ Teste_car_0/
 * 📄 **[Diário de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/DIARIO_ENGENHARIA.md)**
 * 📄 **[Revisão de Engenharia](file:///C:/Users/luneque.junior/Projetos_IA/Teste_car_0/docs/REVISAO_ENGENHARIA.md)** — auditoria de código × documentação e plano de melhorias
 
+## 📄 Atualizações Recentes (27/11/2026 — frenagem ativa)
+
+### Firmware
+- **Frenagem ativa no corte (`SUB_FRENAGEM`):** ao atingir a meta, em vez de ir direto ao neutro, o firmware aplica um pulso curto **oposto ao movimento de cada roda** e só então vai ao neutro e entra na pausa. Constantes: `FRENAGEM_ATIVA = true`, `FRENAGEM_PWM_US = 1400`, `FRENAGEM_TEMPO_MS = 60`. A inércia é integrada durante a frenagem, então o rumo real do mapa continua correto.
+- **Frenagem espelhada no pivô:** na reta as duas rodas frenam com ré (1400/1400); no pivô uma freia com ré e a outra com frente (1400/1600, espelhado em torno do neutro). Aplicar 1400 nas duas acelerava a roda que já vinha em ré e fazia o giro **aumentar** ~2° em vez de parar.
+- **`PIVO_ANTECIPACAO_GRAUS` 5,7° → 3,7°:** com frenagem o corte por IMU passou a acontecer em ~86° e o salto de yaw pós-corte caiu de ~2° para ~0,3°. A antecipação menor compensa parte do giro adicional do pulso.
+- **Dashboard — gráficos não acumulam tempo ocioso:** só `RETA`/`PIVO` alimentam os gráficos; telemetria de `CONCLUIDO`/`AGUARDO` (2 Hz com o robô parado) é descartada, e cada nova execução limpa o histórico e zera o relógio (eixo relativo ao início do movimento). Antes a série sumia para a esquerda após períodos sem operação.
+
+### Resultados no solo (bateria 7,8–8,5 V)
+| Configuração | Lados | Pivôs | Fechamento |
+| :--- | :--- | :--- | :--- |
+| Sem frenagem (5,7°) | 499,6 mm | ~90,5° | 8–18 mm |
+| Frenagem igual, pulso 120 ms | 497 mm | 94,0° | 104 mm |
+| Frenagem espelhada, 120 ms | 499,2 mm | 92,3° | 60 mm |
+| Espelhada, 3,7°, 120 ms | 496,5 mm | 92,7° | 72 mm |
+| **Espelhada, 3,7°, 60 ms (vigente)** | **499,2 mm** | **92,2°** | **55,8 mm** |
+
+- A frenagem reduziu o deslizamento longitudinal da reta de ~20 mm para ~3 mm e o salto de yaw no corte de ~2° para ~0,3°.
+- Os pivôs ainda fecham em ~92° (resíduo ~2° sistemático, independente de bateria, antecipação ou duração do pulso) — a alavanca para corrigi-lo é a rampa/velocidade do pivô, não a antecipação. Registrado como ponto aberto.
+- **Lição operacional:** nunca rodar teste de solo imediatamente após gravar firmware — o robô fica suspenso, o corpo não gira, o pivô cai no fallback de ticks (yaw ~0°) e o teste não valida nada. Um dump assim foi descartado.
+
+### Commits / testes
+- `9a9ca19` zoom horizontal nos 3 gráficos; `f4d10cc` gráficos ignoram tempo ocioso (push feito).
+- 16 + 17 testes nativos, 19 Python, compilação 1.154.135 bytes (29%) / 121.232 bytes (36%) RAM — todos verdes.
+
 ## 📄 Atualizações Recentes (27/11/2026)
 
 ### Firmware

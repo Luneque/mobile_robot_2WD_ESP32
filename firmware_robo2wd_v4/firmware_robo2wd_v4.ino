@@ -99,6 +99,7 @@ EstadoSistema estadoAtual = ESTADO_ARMANDO_ESC;
 enum SubEstadoMovimento {
     SUB_INICIAR_SEGMENTO,
     SUB_EM_MOVIMENTO,
+    SUB_FRENAGEM,             // pulso de ré curto para frear antes do neutro
     SUB_PAUSA_ESTABILIZACAO
 };
 
@@ -118,6 +119,7 @@ uint32_t g_desbalStartTime = 0;
 uint32_t g_loopAnteriorMs = 0;
 uint32_t g_loopMaxMs = 0;
 uint32_t g_pausaStartTime = 0;
+uint32_t g_frenagemStartTime = 0;   // inicio do pulso de frenagem ativa
 
 // Diagnostico de secao lenta: maior duracao de um bloco do loop() desde a
 // ultima amostra de telemetria, e qual bloco foi (id). Publicado como "sr"
@@ -368,11 +370,39 @@ void processarControleMovimento(uint32_t now) {
                           imu.isInitialized());
 
     if (atingiuMeta) {
+#if FRENAGEM_ATIVA
+        // O pulso de frenagem deve ser OPPOSTO ao movimento de cada roda:
+        // - Reta: as duas giram para frente -> ré nas duas (1400 us).
+        // - Pivo: M1 frente / M2 ré (ou o inverso) -> frenar M1 com ré e M2
+        //   com frente. Aplicar 1400 nas duas acelerava a roda que já ia em ré,
+        //   fazendo o giro AUMENTAR ~2° em vez de parar.
+        uint32_t pwmFren1, pwmFren2;
+        if (g_emLinhaReta) {
+            pwmFren1 = FRENAGEM_PWM_US;
+            pwmFren2 = FRENAGEM_PWM_US;
+        } else if (g_sentidoGiro > 0) {
+            pwmFren1 = FRENAGEM_PWM_US;                              // M1 vinha em frente -> ré
+            pwmFren2 = 2 * ESC_NEUTRO_US - FRENAGEM_PWM_US;           // M2 vinha em ré -> frente
+        } else {
+            pwmFren1 = 2 * ESC_NEUTRO_US - FRENAGEM_PWM_US;           // M1 vinha em ré -> frente
+            pwmFren2 = FRENAGEM_PWM_US;                              // M2 vinha em frente -> ré
+        }
+        motors.setMicrosecondsM1(pwmFren1);
+        motors.setMicrosecondsM2(pwmFren2);
+        g_lastPwm1 = pwmFren1;
+        g_lastPwm2 = pwmFren2;
+        subEstado = SUB_FRENAGEM;
+        g_frenagemStartTime = now;
+        Serial.printf("[V4-FREN] Corte. Frenagem M1=%d M2=%d us por %d ms. Ticks: (%d, %d)\n",
+                      pwmFren1, pwmFren2, FRENAGEM_TEMPO_MS,
+                      encoders.getTicksM1(), encoders.getTicksM2());
+#else
         motors.stopAll();
         g_lastPwm1 = ESC_NEUTRO_US;
         g_lastPwm2 = ESC_NEUTRO_US;
         subEstado = SUB_PAUSA_ESTABILIZACAO;
         g_pausaStartTime = now;
+#endif
         Serial.printf("[V4-STOP] Segmento concluido. Ticks: (%d, %d) | Yaw IMU: %+.1f deg. Pausando %d ms...\n",
                       encoders.getTicksM1(), encoders.getTicksM2(), imu.getYawAngleDeg(), PAUSA_ENTRE_MOVIMENTOS_MS);
         return;
@@ -1113,6 +1143,21 @@ void loop() {
             else if (subEstado == SUB_EM_MOVIMENTO) {
                 if (now - g_lastLoopTime >= CONTROL_LOOP_MS) {
                     processarControleMovimento(now);
+                }
+            }
+            else if (subEstado == SUB_FRENAGEM) {
+                // Mantem o pulso de ré por FRENAGEM_TEMPO_MS, integrando a
+                // inércia como na pausa (o rumo real precisa incluir o giro
+                // durante a frenagem). Depois vai ao neutro e inicia a pausa.
+                if (now - g_lastLoopTime >= CONTROL_LOOP_MS) {
+                    integrarRumo(now, (now - g_lastLoopTime) / 1000.0f, true);
+                }
+                if (now - g_frenagemStartTime >= FRENAGEM_TEMPO_MS) {
+                    motors.stopAll();
+                    g_lastPwm1 = ESC_NEUTRO_US;
+                    g_lastPwm2 = ESC_NEUTRO_US;
+                    subEstado = SUB_PAUSA_ESTABILIZACAO;
+                    g_pausaStartTime = now;
                 }
             }
             else if (subEstado == SUB_PAUSA_ESTABILIZACAO) {
