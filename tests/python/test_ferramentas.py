@@ -218,6 +218,11 @@ class TestDashboardJS(unittest.TestCase):
                        "function redraw(", "for (const k in charts) zoomLabel(k)"):
             self.assertIn(trecho, js, "logica de zoom sem " + trecho)
         self.assertIn("pushPoint('rpm'", js, "handle() nao alimenta o zoom de RPM")
+        # Graficos nao devem receber amostras ociosas (2 Hz parado), senao a
+        # serie real some para a esquerda; e devem reiniciar na nova execucao.
+        for trecho in ("ESTADOS_GRAFICO", "ultimoEstadoGraf", "tInicioExecGraf",
+                       "if (ESTADOS_GRAFICO.includes(d.st))"):
+            self.assertIn(trecho, js, "filtro de amostras ociosas sem " + trecho)
 
 
 class TestFormatStrings(unittest.TestCase):

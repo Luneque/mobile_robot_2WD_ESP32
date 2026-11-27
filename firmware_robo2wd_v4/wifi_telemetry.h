@@ -200,6 +200,14 @@ const ZOOM_STEPS = [25, 50, 75, 150, 300, 600, 1200, 2400];
 const WIN_DEFAULT = 2;                              // 75 amostras ≈ 3,75 s
 const winIdx = {rpm:WIN_DEFAULT, yaw:WIN_DEFAULT, pwm:WIN_DEFAULT};
 
+// O painel recebe telemetria a 2 Hz mesmo com o robô parado (CONCLUIDO/
+// AGUARDO). Empurrar essas amostras ociosas para os gráficos enchia o buffer
+// de 2400 e fazia a série real sumir para a esquerda. Só RETA/PIVO alimentam
+// os gráficos; numa nova execução o histórico recomeça do zero.
+const ESTADOS_GRAFICO = ['RETA','PIVO'];
+let ultimoEstadoGraf = null;
+let tInicioExecGraf = 0;
+
 // ---- Odometria / Mapa 2D ----
 const MM_PER_TICK = 0.04799656; // 66mm diametro / 4320 ticks
 let posX = 500, posY = 0; // Ponto de partida real: Início (500, 0)
@@ -474,11 +482,24 @@ function handle(d){
   badge.className   = STATE_CLS.includes(d.st) ? d.st : 'AGUARDO';
   // Atualizar segmento
   document.getElementById('segTxt').textContent = 'Lado '+d.sd+' de '+d.of;
-  // Gráficos
-  const t = (d.ts/1000).toFixed(1)+'s';
-  pushPoint('rpm', t, d.r1, d.r2);
-  pushPoint('yaw', t, d.yaw);
-  pushPoint('pwm', t, d.w1, d.w2);
+  // Gráficos: só amostras de movimento. O robô publica telemetria a 2 Hz
+  // quando está parado; empurrar essas amostras ociosas fazia a série sumir
+  // para a esquerda. Numa nova execução, limpa o histórico e zera o tempo.
+  if (ESTADOS_GRAFICO.includes(d.st)) {
+    if (!ESTADOS_GRAFICO.includes(ultimoEstadoGraf)) {
+      for (const k in charts) {
+        hist[k].labels.length = 0;
+        hist[k].sets.forEach(s => { s.length = 0; });
+      }
+      tInicioExecGraf = d.ts;
+      for (const k in charts) redraw(k);
+    }
+    const t = ((d.ts - tInicioExecGraf)/1000).toFixed(1)+'s';
+    pushPoint('rpm', t, d.r1, d.r2);
+    pushPoint('yaw', t, d.yaw);
+    pushPoint('pwm', t, d.w1, d.w2);
+  }
+  ultimoEstadoGraf = d.st;
   // Atualiza mapa 2D
   updateOdometry(d);
   drawMap();
